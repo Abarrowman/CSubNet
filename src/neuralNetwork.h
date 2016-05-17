@@ -14,7 +14,9 @@ typedef struct neuralNetworkStub {
 } neuralNetwork;
 
 matrix* applyNetwork(neuralNetwork* network, matrix* input, matrix* output, matrix* intermediates);
+
 neuralNetwork* annealNetwork(neuralNetwork* original, trainingData* train);
+neuralNetwork* evolveNetwork(neuralNetwork* original, trainingData* train);
 
 neuralNetwork* createEmptyNetwork(int numLayers);
 neuralNetwork* createSizedNetwork(int* sizes, int numLayers);

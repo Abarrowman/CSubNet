@@ -24,33 +24,20 @@ static __inline void applyBiases(netF* __restrict vals, netF* __restrict biases,
 	}
 }
 
-matrix* applyLayer(neuralLayer* layer, matrix* input, matrix* output) {
-	//pre trans
-	//multiplyMatrices(input, layer->matrix, output);
-
-	//post trans
+matrix* applyLayer(neuralLayer* layer, matrix* input, matrix* output, int applySigmoid) {
 	transMultiplyMatrices(input, layer->matrix, output);
 
 	if (output == NULL) {
 		return NULL;
 	}
-
-	applyBiases(output->vals, layer->biases, output->height, output->width);
+	if (applySigmoid) {
+		applyBiases(output->vals, layer->biases, output->height, output->width);
+	}
 	return output;
 }
 
 neuralLayer* cloneLayer(neuralLayer* original, neuralLayer* result) {
 	neuralLayer* layer;
-	//pre trans
-	/*int outputs = original->matrix->width;
-	if (result == NULL || (result->matrix->width != outputs)
-			|| (result->matrix->height != original->matrix->height)) {
-		layer = createLayer(original->matrix->height, outputs);
-	} else {
-		layer = result;
-	}*/
-
-	//post trans
 	int inputs = original->matrix->width;
 	int outputs = original->matrix->height;
 	if (result == NULL || (result->matrix->height != outputs)
@@ -67,11 +54,6 @@ neuralLayer* cloneLayer(neuralLayer* original, neuralLayer* result) {
 
 neuralLayer* createLayer(int inputs, int outputs) {
 	neuralLayer* layer = (neuralLayer*)malloc(sizeof(neuralLayer));
-
-	//pre trans
-	//layer->matrix = createIdentityMatrix(inputs, outputs);
-
-	//post trans
 	layer->matrix = createIdentityMatrix(outputs, inputs);
 
 	layer->biases = (netF*)calloc(outputs, sizeof(netF)); //unbaised
@@ -80,11 +62,6 @@ neuralLayer* createLayer(int inputs, int outputs) {
 
 neuralLayer* createLayerWithValues(int inputs, int outputs, netF* coefficients, netF* biases) {
 	neuralLayer* layer = (neuralLayer*)malloc(sizeof(neuralLayer));
-
-	//pre trans
-	//layer->matrix = createMatrixWithValues(inputs, outputs, coefficients);
-
-	//post trans
 	layer->matrix = createMatrixWithValues(outputs, inputs, coefficients);
 
 	layer->biases = (netF*)malloc(sizeof(netF) * outputs);
@@ -101,17 +78,9 @@ void deleteLayer(neuralLayer* layer) {
 }
 
 int getLayerInputs(neuralLayer* layer) {
-	//pre trans
-	//return layer->matrix->height;
-
-	//post trans
 	return layer->matrix->width;
 }
 
 int getLayerOutputs(neuralLayer* layer) {
-	//pre trans
-	//return layer->matrix->width;
-
-	//post trans
 	return layer->matrix->height;
 }

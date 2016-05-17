@@ -11,7 +11,7 @@ typedef struct neuralLayerStub {
 	netF* biases;
 } neuralLayer;
 
-matrix* applyLayer(neuralLayer* layer, matrix* input, matrix* output);
+matrix* applyLayer(neuralLayer* layer, matrix* input, matrix* output, int applySigmoid);
 
 neuralLayer* cloneLayer(neuralLayer* original, neuralLayer* result);
 

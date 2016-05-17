@@ -48,10 +48,10 @@ matrix* applyNetwork(neuralNetwork* network, matrix* input, matrix* output, matr
 	matrix* inter;
 	for (idx = 0; idx < network->numLayers - 1; idx++) {
 		inter = intermediates + idx;
-		applyLayer(network->layers[idx], old, inter);
+		applyLayer(network->layers[idx], old, inter , 1);
 		old = inter;
 	}
-	applyLayer(network->layers[idx], old, output);
+	applyLayer(network->layers[idx], old, output, 1);
 	if (needsIntermediates) {
 		deleteIntermediates(intermediates, network);
 	}
@@ -68,6 +68,72 @@ static netF calculateTrainingDataError(neuralNetwork* network, trainingData* tra
 	return sumSquareMatrix(output) / (output->height * output->width);
 }
 
+static mutateNetwork(neuralNetwork* mutant, netF mutationSize) {
+	int layerIdx;
+	for (layerIdx = 0; layerIdx < mutant->numLayers; layerIdx++) {
+		neuralLayer* layer = mutant->layers[layerIdx];
+		matrix* mat = layer->matrix;
+		int rowIdx;
+		for (rowIdx = 0; rowIdx < mat->height; rowIdx++) {
+			int colIdx;
+			for (colIdx = 0; colIdx < mat->width; colIdx++) {
+				netF* matVal = getMatrixVal(mat, rowIdx, colIdx);
+				//*matVal += (randomNetF() - 0.5);
+				*matVal += mutationSize * (randomNetF() - 0.5f) / 2;
+			}
+		}
+
+		int biases = getLayerOutputs(layer);
+		int biasIdx;
+		for (biasIdx = 0; biasIdx < biases; biasIdx++) {
+			layer->biases[biasIdx] += mutationSize * (randomNetF() - 0.5f);
+		}
+	}
+}
+
+neuralNetwork* evolveNetwork(neuralNetwork* original, trainingData* train) {
+	neuralNetwork* current = cloneNeuralNetwork(original);
+	neuralNetwork* best = cloneNeuralNetwork(original);
+	neuralNetwork* mutant = cloneNeuralNetwork(original);
+	matrix* output = createMatrix(train->output->height, getNetworkOutputs(original));
+	matrix* intermediates = createNetworkIntermediates(original, getTrainingDataCount(train));
+
+	int maxCycles = 500000;
+	int evolutionCycles = 1000;
+
+	netF initialError = calculateTrainingDataError(original, train, output, intermediates);
+	PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Initial %f\n", initialError);
+	netF bestStateError = initialError;
+
+	int cycle;
+	for (cycle = 0; cycle < maxCycles; cycle++) {
+		copyNeuralNetwork(current, mutant);
+		mutateNetwork(mutant, 1.0f);
+
+		netF mutantStateError = calculateTrainingDataError(mutant, train, output, intermediates);
+
+		if (mutantStateError < bestStateError) {
+			bestStateError = mutantStateError;
+			copyNeuralNetwork(mutant, best);
+		}
+		if (cycle % evolutionCycles == 0) {
+			copyNeuralNetwork(best, current);
+		}
+		if (cycle % 10000 == 0) {
+			PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Cycle %d Best %f Mut %f\n", cycle, bestStateError, mutantStateError);
+		}
+	}
+
+	deleteNetwork(current);
+	deleteNetwork(mutant);
+	deleteMatrix(output);
+	deleteIntermediates(intermediates, original);
+
+	PRINT_FLUSH(1, "Cycle %d Initial %f Best %f \n", cycle, initialError, bestStateError);
+
+	return best;
+}
+
 neuralNetwork* annealNetwork(neuralNetwork* original, trainingData* train) {
 
 	neuralNetwork* current = cloneNeuralNetwork(original);
@@ -79,6 +145,7 @@ neuralNetwork* annealNetwork(neuralNetwork* original, trainingData* train) {
 
 
 	int maxCycles = 500000;
+	int cooldownCycles = 50000;
 	netF initialTemp = 5;
 	netF temp = initialTemp;
 	int cyclesWorse = 0;
@@ -90,35 +157,11 @@ neuralNetwork* annealNetwork(neuralNetwork* original, trainingData* train) {
 
 	int cycle;
 	for (cycle = 0; cycle < maxCycles; cycle++) {
+		temp = initialTemp * expf(-3.5f * cycle / cooldownCycles);
 		copyNeuralNetwork(current, mutant);
-
-		int layerIdx;
-		for (layerIdx = 0; layerIdx < mutant->numLayers; layerIdx++) {
-			neuralLayer* layer = mutant->layers[layerIdx];
-			matrix* mat = layer->matrix;
-			int rowIdx;
-			for (rowIdx = 0; rowIdx < mat->height; rowIdx++) {
-				int colIdx;
-				for (colIdx = 0; colIdx < mat->width; colIdx++) {
-					netF* matVal = getMatrixVal(mat, rowIdx, colIdx);
-					//*matVal += (randomNetF() - 0.5);
-					*matVal += (randomNetF() - 0.5f) / 2;
-				}
-			}
-
-			int biases = getLayerOutputs(layer);
-			int biasIdx;
-			for (biasIdx = 0; biasIdx < biases; biasIdx++) {
-				layer->biases[biasIdx] += (randomNetF() - 0.5f);
-			}
-		}
+		mutateNetwork(mutant, 1.0f);//(1.0f + temp) / 2.0f);
 
 		netF mutantStateError = calculateTrainingDataError(mutant, train, output, intermediates);
-		if (cycle % 10000 == 0) {
-			PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Cycle %d Temp %f Best %f Curr %f Mut %f\n", cycle, temp,
-					bestStateError, currentStateError, mutantStateError);
-			//printNeuralNetwork(current);
-		}
 
 		if (determineAcceptanceThreshold(temp, currentStateError, mutantStateError)
 				> randomNetF()) {
@@ -138,8 +181,10 @@ neuralNetwork* annealNetwork(neuralNetwork* original, trainingData* train) {
 			copyNeuralNetwork(mutant, best);
 		}
 
-		//temp = initialTemp - initialTemp * cycles / maxCycles;
-		temp = initialTemp * expf(-3.5f * cycle / maxCycles);
+		if (cycle % 10000 == 0) {
+			PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Cycle %d Temp %f Best %f Curr %f Mut %f\n", cycle, temp,
+					bestStateError, currentStateError, mutantStateError);
+		}
 	}
 
 	deleteNetwork(current);

@@ -24,7 +24,8 @@ void help() {
 		"Options:\n"
 		"Rounds: -r=n\n"
 		"Layer Sizes: -s=v,w,x,y,z\n"
-		"Label Columns: -l=x\n")
+		"Label Columns: -l=x\n"
+		"Algorithm: -a=[anneal,evolve]\n")
 		system("pause");
 }
 
@@ -36,6 +37,7 @@ int train(int paramCount, char** params) {
 	int labelColumns = 0;
 	int layerSizes[MAX_NETWORK_SIZES];
 	int defaultsFilled = 0;
+	int alg = 0;
 	intResult ir;
 
 	int paramIdx;
@@ -75,6 +77,22 @@ int train(int paramCount, char** params) {
 					return 1;
 				}
 				labelColumns = ir.result;
+				break;
+			case 'a':
+				if (paramLen <= 2 || param[2] != '=') {
+					PRINT_FLUSH(1, "Failed to parse option [%s].", param)
+					help();
+					return 1;
+				}
+				char* algorithmString = param + 3;
+				if (!strcmp(algorithmString, "anneal")) {
+					alg = 0;
+				} else if (!strcmp(algorithmString, "evolve")) {
+					alg = 1;
+				} else {
+					PRINT_FLUSH(1, "Failed to parse algorithm [%s].", param)
+					help();
+				}
 				break;
 			default:
 				PRINT_FLUSH(1, "Unknown option [%s].", param)
@@ -131,7 +149,13 @@ int train(int paramCount, char** params) {
 		network = createSizedNetwork(layerSizes, numSizes - 1);
 	}
 
-	neuralNetwork* optimalNetwork = annealNetwork(network, trainDataPtr);
+	neuralNetwork* optimalNetwork = NULL;
+	if (alg == 0) {
+		optimalNetwork = annealNetwork(network, trainDataPtr);
+	} else if (alg == 1) {
+		optimalNetwork = evolveNetwork(network, trainDataPtr);
+	}
+
 	stringFragment encoded = encodeNeuralNetwork(optimalNetwork);
 	int errCode = 0;
 	if (!writeFileFromMemory(outputNetFile, encoded)) {
@@ -153,6 +177,7 @@ int reTrain(int paramCount, char** params) {
 	char* outputNetFile = NULL;
 	int defaultsFilled = 0;
 	int labelColumns = 0;
+	int alg = 0;
 	int paramIdx;
 	intResult ir;
 	for (paramIdx = 0; paramIdx < paramCount; paramIdx++) {
@@ -216,7 +241,14 @@ int reTrain(int paramCount, char** params) {
 		help();
 		return 1;
 	}
-	neuralNetwork* optimalNetwork = annealNetwork(network, trainDataPtr);
+
+	neuralNetwork* optimalNetwork = NULL;
+	if (alg == 0) {
+		optimalNetwork = annealNetwork(network, trainDataPtr);
+	} else if (alg == 1) {
+		optimalNetwork = evolveNetwork(network, trainDataPtr);
+	}
+
 
 	stringFragment encoded = encodeNeuralNetwork(optimalNetwork);
 	int errCode = 0;

@@ -1,7 +1,9 @@
 #ifndef _CORE_DEFS_H
 #define _CORE_DEFS_H
 
-typedef float netF;
+//typedef float netF;
+typedef double netF;
+
 
 /*#ifdef __GNUC__
 typedef int errno_t;
