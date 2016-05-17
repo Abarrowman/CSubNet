@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
+#include <math.h>
 #include "csv.h"
 #include "utils.h"
 #include "matrix.h"
@@ -217,7 +218,13 @@ matrix* extractMatrixFromCSV(csv* data, int topRow, int leftCol, int wide, int h
 	for (yn = 0; yn < high; yn++) {
 		int xn;
 		for (xn = 0; xn < wide; xn++) {
-			setMatrixVal(mat, yn, xn, getCSVCelAsNetF(data, yn + topRow, xn + leftCol));
+			netF val = getCSVCelAsNetF(data, yn + topRow, xn + leftCol);
+			if (isnan(val)){
+				deleteMatrix(mat);
+				return NULL;
+			} else {
+				setMatrixVal(mat, yn, xn, val);
+			}
 		}
 	}
 	return mat;

@@ -29,6 +29,9 @@ trainingData* readTrainingData(trainingData* data, char* file, int inputCols, in
 			csvData->cols - inputCols - labelCols, csvData->rows);
 
 	deleteCSV(csvData);
+	if (!data->input || !data->output) {
+		return NULL;
+	}
 	return data;
 }
 
