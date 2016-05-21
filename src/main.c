@@ -25,7 +25,7 @@ void help() {
 		"Rounds: -r=n\n"
 		"Layer Sizes: -s=v,w,x,y,z\n"
 		"Label Columns: -l=x\n"
-		"Algorithm: -a=[anneal,evolve]\n")
+		"Algorithm: -a=[anneal,evolve,gradient]\n")
 		system("pause");
 }
 
@@ -89,6 +89,8 @@ int train(int paramCount, char** params) {
 					alg = 0;
 				} else if (!strcmp(algorithmString, "evolve")) {
 					alg = 1;
+				} else if (!strcmp(algorithmString, "gradient")) {
+					alg = 2;
 				} else {
 					PRINT_FLUSH(1, "Failed to parse algorithm [%s].", param)
 					help();
@@ -154,6 +156,8 @@ int train(int paramCount, char** params) {
 		optimalNetwork = annealNetwork(network, trainDataPtr);
 	} else if (alg == 1) {
 		optimalNetwork = evolveNetwork(network, trainDataPtr);
+	} else if (alg == 2) {
+		optimalNetwork = gradientClimbNetwork(network, trainDataPtr);
 	}
 
 	stringFragment encoded = encodeNeuralNetwork(optimalNetwork);
@@ -201,6 +205,24 @@ int reTrain(int paramCount, char** params) {
 				}
 				labelColumns = ir.result;
 				break;
+			case 'a':
+				if (paramLen <= 2 || param[2] != '=') {
+					PRINT_FLUSH(1, "Failed to parse option [%s].", param)
+						help();
+					return 1;
+				}
+				char* algorithmString = param + 3;
+				if (!strcmp(algorithmString, "anneal")) {
+					alg = 0;
+				} else if (!strcmp(algorithmString, "evolve")) {
+					alg = 1;
+				} else if (!strcmp(algorithmString, "gradient")) {
+					alg = 2;
+				} else {
+					PRINT_FLUSH(1, "Failed to parse algorithm [%s].", param)
+						help();
+				}
+				break;
 			default:
 				PRINT_FLUSH(1, "Unknown option [%s].\n", param)
 				help();
@@ -247,6 +269,8 @@ int reTrain(int paramCount, char** params) {
 		optimalNetwork = annealNetwork(network, trainDataPtr);
 	} else if (alg == 1) {
 		optimalNetwork = evolveNetwork(network, trainDataPtr);
+	} else if (alg == 2) {
+		optimalNetwork = gradientClimbNetwork(network, trainDataPtr);
 	}
 
 

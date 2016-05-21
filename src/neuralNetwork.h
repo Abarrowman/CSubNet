@@ -17,6 +17,7 @@ matrix* applyNetwork(neuralNetwork* network, matrix* input, matrix* output, matr
 
 neuralNetwork* annealNetwork(neuralNetwork* original, trainingData* train);
 neuralNetwork* evolveNetwork(neuralNetwork* original, trainingData* train);
+neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train);
 
 neuralNetwork* createEmptyNetwork(int numLayers);
 neuralNetwork* createSizedNetwork(int* sizes, int numLayers);
