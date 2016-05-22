@@ -8,7 +8,8 @@
 
 __inline netF layerSigmoid(netF input) {
 		//return 1 / (1 + exp(-input));
-		return (input / (1 + fabsf(input)) + 1) / 2;
+		//return (input / (1 + fabsf(input)) + 1) / 2;
+		return (input / (1 + fabs(input)) + 1) / 2;
 }
 	
 static __inline void applyBiases(netF* __restrict vals, netF* __restrict biases, const int outHigh, const int outWide) {

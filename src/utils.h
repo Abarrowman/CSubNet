@@ -1,7 +1,7 @@
 #ifndef UTILS_H_
 #define UTILS_H_
 
-#include "stdio.h"
+#include <stdio.h>
 #include "coreDefs.h"
 
 struct stringFragmentStub;

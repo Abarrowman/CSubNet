@@ -4,6 +4,7 @@
 #include "matrix.h"
 #include "utils.h"
 #include "coreDefs.h"
+#include "vector.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -122,7 +123,8 @@ neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train
 		layer = original->layers[n];
 		netFCount += (getLayerInputs(layer) + 1) * getLayerOutputs(layer);
 	}
-	netF* changeVector = malloc(sizeof(netF) * netFCount);
+	//netF* changeVector = malloc(sizeof(netF) * netFCount);
+	vector* changeVector = createVector(netFCount);
 	netF currentStateError = initialError;
 
 
@@ -136,7 +138,9 @@ neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train
 	int cycle;
 	for (cycle = 0; cycle < maxCycles; cycle+=2) {
 
-		netF stepSize = initStepSize * exp(-2.0 * cycle / maxCycles) + 0.001;
+		//netF stepSize = initStepSize * exp(-2.0 * cycle / maxCycles) + 0.001;
+		netF stepSize = initStepSize * exp(-3.5 * cycle / maxCycles) + 0.001;
+
 
 		copyNeuralNetwork(current, mutant);
 
@@ -150,7 +154,7 @@ neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train
 			bestStateError = mutantStateError;
 			copyNeuralNetwork(mutant, best);
 		}
-		changeVector[vectorIdx] = (currentStateError - mutantStateError) / stepSize;
+		changeVector->vals[vectorIdx] = (currentStateError - mutantStateError) / stepSize;
 
 		if (isBias) {
 			currentLayer->biases[currentIdx] -= 2 * stepSize;
@@ -162,7 +166,7 @@ neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train
 			bestStateError = mutantStateError;
 			copyNeuralNetwork(mutant, best);
 		}
-		changeVector[vectorIdx] -= (currentStateError - mutantStateError) / stepSize;
+		changeVector->vals[vectorIdx] -= (currentStateError - mutantStateError) / stepSize;
 
 
 		currentIdx++;
@@ -178,16 +182,8 @@ neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train
 					//}
 					//PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "%f\n", changeVector[i]);
 
-					//normalize the change vector
-					netF totalMag = 0;
-					for (i = 0; i < netFCount; i++) {
-						totalMag += changeVector[i] * changeVector[i];
-					}
-					totalMag = sqrt(totalMag);
 					netF randVal = 1;// randomNetF();
-					for (i = 0; i < netFCount; i++) {
-						changeVector[i] = changeVector[i] / totalMag * randVal * stepSize;
-					}
+					scaleVector(normalizeVector(changeVector), randVal * stepSize);
 
 					//add the change vector to the current state
 					int layerIdx;
@@ -200,14 +196,14 @@ neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train
 							int colIdx;
 							for (colIdx = 0; colIdx < mat->width; colIdx++) {
 								netF* matVal = getMatrixVal(mat, rowIdx, colIdx);
-								*matVal += changeVector[i++];
+								*matVal += changeVector->vals[i++];
 							}
 						}
 
 						int biases = getLayerOutputs(layer);
 						int biasIdx;
 						for (biasIdx = 0; biasIdx < biases; biasIdx++) {
-							layer->biases[biasIdx] += changeVector[i++];
+							layer->biases[biasIdx] += changeVector->vals[i++];
 						}
 					}
 					//mutateNetwork(current, 0.01);
@@ -241,7 +237,7 @@ neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train
 		}
 	}
 
-	free(changeVector);
+	deleteVector(changeVector);
 	FINISH_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates)
 }
 
