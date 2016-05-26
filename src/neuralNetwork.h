@@ -15,6 +15,7 @@ typedef struct neuralNetworkStub {
 
 matrix* applyNetwork(neuralNetwork* network, matrix* input, matrix* output, matrix* intermediates);
 
+neuralNetwork* swarmOptimizeNetwork(neuralNetwork* original, trainingData* train);
 neuralNetwork* annealNetwork(neuralNetwork* original, trainingData* train);
 neuralNetwork* evolveNetwork(neuralNetwork* original, trainingData* train);
 neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train);

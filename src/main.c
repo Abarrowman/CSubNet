@@ -29,6 +29,38 @@ void help() {
 		system("pause");
 }
 
+#define ALGORITHM_OPTION(paramLen, param, alg) case 'a': \
+if (paramLen <= 2 || param[2] != '=') { \
+	PRINT_FLUSH(1, "Failed to parse option [%s].", param) \
+		help(); \
+	return 1; \
+} \
+char* algorithmString = param + 3; \
+if (!strcmp(algorithmString, "anneal")) { \
+	alg = 0; \
+} else if (!strcmp(algorithmString, "evolve")) { \
+	alg = 1; \
+} else if (!strcmp(algorithmString, "gradient")) { \
+	alg = 2; \
+} else if (!strcmp(algorithmString, "swarm")) { \
+	alg = 3; \
+} else { \
+	PRINT_FLUSH(1, "Failed to parse algorithm [%s].", param) \
+	help(); \
+} \
+break;
+
+#define OPTIMIZE_NETWORK(optimalNetwork, network, trainDataPtr, alg) neuralNetwork* optimalNetwork = NULL; \
+if (alg == 0) { \
+	optimalNetwork = annealNetwork(network, trainDataPtr); \
+} else if (alg == 1) { \
+	optimalNetwork = evolveNetwork(network, trainDataPtr); \
+} else if (alg == 2) { \
+	optimalNetwork = gradientClimbNetwork(network, trainDataPtr); \
+} else if (alg == 3) { \
+	optimalNetwork = swarmOptimizeNetwork(network, trainDataPtr); \
+}
+
 int train(int paramCount, char** params) {
 	char* trainCSVFile = NULL;
 	int inputColumns;
@@ -78,24 +110,7 @@ int train(int paramCount, char** params) {
 				}
 				labelColumns = ir.result;
 				break;
-			case 'a':
-				if (paramLen <= 2 || param[2] != '=') {
-					PRINT_FLUSH(1, "Failed to parse option [%s].", param)
-					help();
-					return 1;
-				}
-				char* algorithmString = param + 3;
-				if (!strcmp(algorithmString, "anneal")) {
-					alg = 0;
-				} else if (!strcmp(algorithmString, "evolve")) {
-					alg = 1;
-				} else if (!strcmp(algorithmString, "gradient")) {
-					alg = 2;
-				} else {
-					PRINT_FLUSH(1, "Failed to parse algorithm [%s].", param)
-					help();
-				}
-				break;
+			ALGORITHM_OPTION(paramLen, param, alg)
 			default:
 				PRINT_FLUSH(1, "Unknown option [%s].", param)
 				help();
@@ -151,14 +166,7 @@ int train(int paramCount, char** params) {
 		network = createSizedNetwork(layerSizes, numSizes - 1);
 	}
 
-	neuralNetwork* optimalNetwork = NULL;
-	if (alg == 0) {
-		optimalNetwork = annealNetwork(network, trainDataPtr);
-	} else if (alg == 1) {
-		optimalNetwork = evolveNetwork(network, trainDataPtr);
-	} else if (alg == 2) {
-		optimalNetwork = gradientClimbNetwork(network, trainDataPtr);
-	}
+	OPTIMIZE_NETWORK(optimalNetwork, network, trainDataPtr, alg)
 
 	stringFragment encoded = encodeNeuralNetwork(optimalNetwork);
 	int errCode = 0;
@@ -205,24 +213,7 @@ int reTrain(int paramCount, char** params) {
 				}
 				labelColumns = ir.result;
 				break;
-			case 'a':
-				if (paramLen <= 2 || param[2] != '=') {
-					PRINT_FLUSH(1, "Failed to parse option [%s].", param)
-						help();
-					return 1;
-				}
-				char* algorithmString = param + 3;
-				if (!strcmp(algorithmString, "anneal")) {
-					alg = 0;
-				} else if (!strcmp(algorithmString, "evolve")) {
-					alg = 1;
-				} else if (!strcmp(algorithmString, "gradient")) {
-					alg = 2;
-				} else {
-					PRINT_FLUSH(1, "Failed to parse algorithm [%s].", param)
-						help();
-				}
-				break;
+			ALGORITHM_OPTION(paramLen, param, alg)
 			default:
 				PRINT_FLUSH(1, "Unknown option [%s].\n", param)
 				help();
@@ -264,15 +255,7 @@ int reTrain(int paramCount, char** params) {
 		return 1;
 	}
 
-	neuralNetwork* optimalNetwork = NULL;
-	if (alg == 0) {
-		optimalNetwork = annealNetwork(network, trainDataPtr);
-	} else if (alg == 1) {
-		optimalNetwork = evolveNetwork(network, trainDataPtr);
-	} else if (alg == 2) {
-		optimalNetwork = gradientClimbNetwork(network, trainDataPtr);
-	}
-
+	OPTIMIZE_NETWORK(optimalNetwork, network, trainDataPtr, alg)
 
 	stringFragment encoded = encodeNeuralNetwork(optimalNetwork);
 	int errCode = 0;

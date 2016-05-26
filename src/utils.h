@@ -21,6 +21,7 @@ typedef struct intResultStub {
 
 void seedRand();
 netF randomNetF();
+netF randomZeroCenteredNetF();
 int randomInt(int min, int max);
 
 stringFragment cStringToFragment(char* cString);

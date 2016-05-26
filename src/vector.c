@@ -1,7 +1,8 @@
 #include "vector.h"
 #include <stdlib.h>
+#include <string.h>
 
-vector* createVector(int length) {
+vector* createVector(size_t length) {
 	vector* vec = malloc(sizeof(vector));
 	if (!vec) {
 		return NULL;
@@ -15,21 +16,32 @@ vector* createVector(int length) {
 	return vec;
 }
 
-vector* createZeroVector(int length) {
+vector* createZeroVector(size_t length) {
 	vector* vec = createVector(length);
 	if (!vec) {
 		return NULL;
 	}
-	int i;
-	for (i = 0; i < length; i++) {
-		vec->vals[i] = 0;
-	}
-
-	return vec;
+	return fillVectorZero(vec);
 }
 
+vector* cloneVector(vector* vec) {
+	vector* dest = createVector(vec->length);
+	if (!dest) {
+		return NULL;
+	}
+	return copyVector(vec, dest);
+}
 
-vector* normalizeVector(vector* vec) {
+vector* copyVector(vector* vec, vector* dest) {
+	memcpy(dest->vals, vec->vals, sizeof(netF) * dest->length);
+	return dest;
+}
+
+vector* scaleVectorSelf(vector* vec, netF mag) {
+	return scaleVector(vec, mag, vec);
+}
+
+vector* scaleVector(vector* vec, netF mag, vector* dest) {
 	netF totalMag = 0;
 	int i;
 	for (i = 0; i < vec->length; i++) {
@@ -37,16 +49,78 @@ vector* normalizeVector(vector* vec) {
 	}
 	totalMag = sqrt(totalMag);
 	for (i = 0; i < vec->length; i++) {
-		vec->vals[i] = vec->vals[i] / totalMag;
+		dest->vals[i] = vec->vals[i] / totalMag * mag;
 	}
-	return vec;
+	return dest;
 }
 
-vector* scaleVector(vector* vec, netF scale) {
+vector* normalizeVector(vector* vec, vector* dest) {
+	return scaleVector(vec, 1, dest);
+}
+
+
+vector* normalizeVectorSelf(vector* vec) {
+	return scaleVector(vec, 1, vec);
+}
+
+vector* multiplyVectorSelf(vector* vec, netF scale) {
+	return multiplyVector(vec, scale, vec);
+}
+
+vector* multiplyVector(vector* vec, netF scale, vector* dest) {
 	int i;
 	for (i = 0; i < vec->length; i++) {
-		vec->vals[i] *= scale;
+		dest->vals[i] = vec->vals[i] * scale;
 	}
+	return dest;
+}
+
+vector* addVectorToSelf(vector* left, vector* right) {
+	return addVectors(left, right, left);
+}
+
+vector* addVectors(vector* left, vector* right, vector* dest) {
+	if ((!left) ||
+		(!right) ||
+		(!dest)) {
+		return NULL;
+	}
+	size_t len = left->length;
+	if ((len != right->length) ||
+		(len != dest->length)) {
+		return NULL;
+	}
+	int i;
+	for (i = 0; i < len; i++) {
+		dest->vals[i] = left->vals[i] + right->vals[i];
+	}
+	return dest;
+}
+
+vector* subVectorFromSelf(vector* left, vector* right) {
+	return subVectors(left, right, left);
+}
+
+vector* subVectors(vector* left, vector* right, vector* dest) {
+	if ((!left) ||
+		(!right) ||
+		(!dest)) {
+		return NULL;
+	}
+	size_t len = left->length;
+	if ((len != right->length) ||
+		(len != dest->length)) {
+		return NULL;
+	}
+	int i;
+	for (i = 0; i < len; i++) {
+		dest->vals[i] = left->vals[i] - right->vals[i];
+	}
+	return dest;
+}
+
+vector* fillVectorZero(vector* vec) {
+	memset(vec->vals, 0, sizeof(netF) * vec->length);
 	return vec;
 }
 

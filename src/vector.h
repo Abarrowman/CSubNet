@@ -10,12 +10,28 @@ typedef struct vectorStub {
 	size_t length;
 } vector;
 
-vector* createVector(int length);
-vector* createZeroVector(int length);
+vector* createVector(size_t length);
+vector* createZeroVector(size_t length);
+vector* cloneVector(vector* vec);
 
-vector* normalizeVector(vector* vec);
-vector* scaleVector(vector* vec, netF scale);
+vector* copyVector(vector* vec, vector* dest);
 
+vector* normalizeVector(vector* vec, vector* output);
+vector* normalizeVectorSelf(vector* vec);
+
+vector* scaleVectorSelf(vector* vec, netF mag);
+vector* scaleVector(vector* vec, netF mag, vector* output);
+
+vector* multiplyVectorSelf(vector* vec, netF scale);
+vector* multiplyVector(vector* vec, netF scale, vector* output);
+
+vector* addVectorToSelf(vector* left, vector* right);
+vector* addVectors(vector* left, vector* right, vector* dest);
+
+vector* subVectorFromSelf(vector* left, vector* right);
+vector* subVectors(vector* left, vector* right, vector* dest);
+
+vector* fillVectorZero(vector* vec);
 
 void deleteVector(vector* vec);
 

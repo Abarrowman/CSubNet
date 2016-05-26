@@ -70,7 +70,7 @@ static netF calculateTrainingDataError(neuralNetwork* network, trainingData* tra
 	return sumSquareMatrix(output) / (output->height * output->width);
 }
 
-static mutateNetwork(neuralNetwork* mutant, netF mutationSize) {
+static neuralNetwork* mutateNetwork(neuralNetwork* mutant, netF mutationSize) {
 	int layerIdx;
 	for (layerIdx = 0; layerIdx < mutant->numLayers; layerIdx++) {
 		neuralLayer* layer = mutant->layers[layerIdx];
@@ -91,6 +91,7 @@ static mutateNetwork(neuralNetwork* mutant, netF mutationSize) {
 			layer->biases[biasIdx] += mutationSize * (randomNetF() - 0.5f);
 		}
 	}
+	return mutant;
 }
 
 #define START_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates, initialError, bestStateError) \
@@ -110,20 +111,167 @@ deleteMatrix(output); \
 deleteIntermediates(intermediates, original); \
 return best;
 
+static neuralNetwork* addVectorToNetwork(vector* change, neuralNetwork* net) {
+	int layerIdx;
+	int i = 0;
+	for (layerIdx = 0; layerIdx < net->numLayers; layerIdx++) {
+		neuralLayer* layer = net->layers[layerIdx];
+		matrix* mat = layer->matrix;
+		int rowIdx;
+		for (rowIdx = 0; rowIdx < mat->height; rowIdx++) {
+			int colIdx;
+			for (colIdx = 0; colIdx < mat->width; colIdx++) {
+				netF* matVal = getMatrixVal(mat, rowIdx, colIdx);
+				*matVal += change->vals[i++];
+			}
+		}
+
+		int biases = getLayerOutputs(layer);
+		int biasIdx;
+		for (biasIdx = 0; biasIdx < biases; biasIdx++) {
+			layer->biases[biasIdx] += change->vals[i++];
+		}
+	}
+	return net;
+}
+
+static int countNetworkParameters(neuralNetwork* net) {
+	int n = 0;
+	int paramCount = 0;
+	neuralLayer* layer = NULL;
+	for (n = 0; n < net->numLayers; n++) {
+		layer = net->layers[n];
+		paramCount += (getLayerInputs(layer) + 1) * getLayerOutputs(layer);
+	}
+	return paramCount;
+}
+
+static vector* copyNetworkToVector(neuralNetwork* net, vector* vec) {
+	int layerIdx;
+	int i = 0;
+	for (layerIdx = 0; layerIdx < net->numLayers; layerIdx++) {
+		neuralLayer* layer = net->layers[layerIdx];
+		matrix* mat = layer->matrix;
+		int rowIdx;
+		for (rowIdx = 0; rowIdx < mat->height; rowIdx++) {
+			int colIdx;
+			for (colIdx = 0; colIdx < mat->width; colIdx++) {
+				netF* matVal = getMatrixVal(mat, rowIdx, colIdx);
+				vec->vals[i++] = *matVal;
+			}
+		}
+
+		int biases = getLayerOutputs(layer);
+		int biasIdx;
+		for (biasIdx = 0; biasIdx < biases; biasIdx++) {
+			vec->vals[i++] = layer->biases[biasIdx];
+		}
+	}
+	return vec;
+}
+
+static vector* networkAsVector(neuralNetwork* net) {
+	vector* vec = createVector(countNetworkParameters(net));
+	return copyNetworkToVector(net, vec);
+}
+
+neuralNetwork* swarmOptimizeNetwork(neuralNetwork* original, trainingData* train) {
+	neuralNetwork* best = cloneNeuralNetwork(original);
+	matrix* output = createMatrix(train->output->height, getNetworkOutputs(original));
+	matrix* intermediates = createNetworkIntermediates(original, getTrainingDataCount(train));
+	netF initialError = calculateTrainingDataError(original, train, output, intermediates);
+	PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Initial %f\n", initialError)
+	netF bestStateError = initialError;
+
+	int numParticles = 100;
+	netF searchArea = 20;
+	netF friction = 0.7;
+	netF startAttraction = 1;
+	netF bestAttraction = 2;
+	int maxCycles = 5000000;
+
+
+	int paramCount = countNetworkParameters(original);
+	vector* bestLoc = copyNetworkToVector(original, createVector(paramCount));
+
+	//consider using a struct instead
+	neuralNetwork** particles = malloc(sizeof(neuralNetwork*) * numParticles);
+	vector** starts = malloc(sizeof(vector*) * numParticles);
+	vector** locations = malloc(sizeof(vector*) * numParticles);
+	vector** velocities = malloc(sizeof(vector*) * numParticles);
+
+	int n;
+	neuralNetwork* mutant;
+	for (n = 0; n < numParticles; n++) {
+		mutant = mutateNetwork(cloneNeuralNetwork(original), searchArea);
+		particles[n] = mutant;
+		vector* startPos = copyNetworkToVector(mutant, createVector(paramCount));
+		starts[n] = startPos;
+		locations[n] = cloneVector(startPos);
+		velocities[n] = createZeroVector(paramCount);
+		netF mutantStateError = calculateTrainingDataError(mutant, train, output, intermediates);
+		if (mutantStateError < bestStateError) {
+			bestStateError = mutantStateError;
+			copyNeuralNetwork(mutant, best);
+			copyVector(startPos, bestLoc);
+		}
+	}
+
+	int cycle;
+	vector* temp = createVector(paramCount);
+	for (cycle = 0; cycle < maxCycles; cycle++) {
+		int particleIdx = cycle % numParticles;
+		vector* velocity = velocities[particleIdx];
+		multiplyVectorSelf(velocity, friction);
+		vector* location = locations[particleIdx];
+		subVectors(starts[particleIdx], location, temp);
+		multiplyVectorSelf(temp, startAttraction * randomNetF());
+		addVectorToSelf(velocity, temp);
+		subVectors(bestLoc, location, temp);
+		multiplyVectorSelf(temp, bestAttraction * randomNetF());
+		addVectorToSelf(velocity, temp);
+
+		mutant = particles[particleIdx];
+		addVectorToNetwork(velocity, mutant);
+		copyNetworkToVector(mutant, location);
+
+		netF mutantStateError = calculateTrainingDataError(mutant, train, output, intermediates);
+		if (mutantStateError < bestStateError) {
+			bestStateError = mutantStateError;
+			copyNeuralNetwork(mutant, best);
+			copyVector(location, bestLoc);
+		}
+		if (cycle % 10000 == 0) {
+			PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Cycle %d Best %f Mut %f\n", cycle,
+				bestStateError, mutantStateError)
+		}
+	}
+	deleteVector(temp);
+
+
+	for (n = 0; n < numParticles; n++) {
+		deleteNetwork(particles[n]);
+		deleteVector(starts[n]);
+		deleteVector(velocities[n]);
+		deleteVector(locations[n]);
+	}
+	free(bestLoc);
+	free(locations);
+	free(velocities);
+	free(starts);
+	free(particles);
+	deleteMatrix(output);
+	deleteIntermediates(intermediates, original);
+	return best;
+}
+
 neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train) {
 	START_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates, initialError, bestStateError)
 
 	int maxCycles = 50000000;
 	netF initStepSize = 0.5;
 
-	int netFCount = 0;
-	int n = 0;
-	neuralLayer* layer = NULL;
-	for (n = 0; n < original->numLayers; n++) {
-		layer = original->layers[n];
-		netFCount += (getLayerInputs(layer) + 1) * getLayerOutputs(layer);
-	}
-	//netF* changeVector = malloc(sizeof(netF) * netFCount);
+	int netFCount = countNetworkParameters(original);
 	vector* changeVector = createVector(netFCount);
 	netF currentStateError = initialError;
 
@@ -138,8 +286,12 @@ neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train
 	int cycle;
 	for (cycle = 0; cycle < maxCycles; cycle+=2) {
 
-		//netF stepSize = initStepSize * exp(-2.0 * cycle / maxCycles) + 0.001;
-		netF stepSize = initStepSize * exp(-3.5 * cycle / maxCycles) + 0.001;
+		//netF stepSize = initStepSize * exp(-2.0 * cycle / maxCycles) + 0.001; //3 -> 41081
+		//netF stepSize = initStepSize * exp(-5.0 * cycle / maxCycles) + 0.001; //3 -> 40594
+		//netF stepSize = initStepSize * exp(-7.0 * cycle / maxCycles) + 0.001; //3 -> 40379
+		//netF stepSize = initStepSize * exp(-9.5 * cycle / maxCycles) + 0.001; //  3 -> ? 40427
+		//netF stepSize = initStepSize * exp(-13.0 * cycle / maxCycles) + 0.001; //  3 -> 40507
+		netF stepSize = 0.1; //3 -> ???
 
 
 		copyNeuralNetwork(current, mutant);
@@ -168,52 +320,22 @@ neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train
 		}
 		changeVector->vals[vectorIdx] -= (currentStateError - mutantStateError) / stepSize;
 
-
 		currentIdx++;
 		vectorIdx++;
 		if (isBias) {
 			if (currentIdx == lastIdx) {
 				if ((++currentLayerIdx) >= mutant->numLayers) {
-					
-					//log the change vector
-					int i;
-					//for (i = 0; i < netFCount - 1; i++) {
-					//	PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "%f, ", changeVector[i]);
-					//}
-					//PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "%f\n", changeVector[i]);
-
 					netF randVal = 1;// randomNetF();
-					scaleVector(normalizeVector(changeVector), randVal * stepSize);
-
-					//add the change vector to the current state
-					int layerIdx;
-					i = 0;
-					for (layerIdx = 0; layerIdx < current->numLayers; layerIdx++) {
-						layer = current->layers[layerIdx];
-						matrix* mat = layer->matrix;
-						int rowIdx;
-						for (rowIdx = 0; rowIdx < mat->height; rowIdx++) {
-							int colIdx;
-							for (colIdx = 0; colIdx < mat->width; colIdx++) {
-								netF* matVal = getMatrixVal(mat, rowIdx, colIdx);
-								*matVal += changeVector->vals[i++];
-							}
-						}
-
-						int biases = getLayerOutputs(layer);
-						int biasIdx;
-						for (biasIdx = 0; biasIdx < biases; biasIdx++) {
-							layer->biases[biasIdx] += changeVector->vals[i++];
-						}
-					}
+					scaleVectorSelf(changeVector, randVal * stepSize);
+					addVectorToNetwork(changeVector, current);
 					//mutateNetwork(current, 0.01);
-					//it might be the best one yet
+
 					currentStateError = calculateTrainingDataError(current, train, output, intermediates);
 					if (currentStateError < bestStateError) {
 						bestStateError = currentStateError;
 						copyNeuralNetwork(current, best);
 					}
-					//move on
+
 					currentLayerIdx = 0;
 					vectorIdx = 0;
 				}
@@ -404,15 +526,10 @@ int getNetworkInputs(neuralNetwork* network) {
 }
 
 stringFragment encodeNeuralNetwork(neuralNetwork* network) {
-	size_t encodedSize = sizeof(int);//number of layers
+	size_t encodedSize = sizeof(int);
 	int layer = 0;
 	for (layer = 0; layer < network->numLayers; layer++) {
 		matrix* mat = network->layers[layer]->matrix;
-
-		//pre trans
-		//encodedSize += sizeof(netF) * mat->width * (mat->height + 1) + 2 * sizeof(int);
-
-		//post trans
 		encodedSize += sizeof(netF) * (mat->width + 1) * mat->height  + 2 * sizeof(int);
 	}
 
