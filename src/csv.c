@@ -9,6 +9,8 @@
 
 #define MAX_CSV_SIZE (1024 * 1024 * 10)
 #define CSV_INCLUDE_DEBUG_LOGS 0
+#define CSV_INCLUDE_ERROR_LOGS 1
+
 
 
 void deleteCSV(csv* data) {
@@ -97,6 +99,7 @@ csv* readCSV(char* file) {
 	char* csvText = csvFile.start;
 	size_t csvLen = csvFile.length;
 	if (csvText == NULL) {
+		PRINT_FLUSH(CSV_INCLUDE_ERROR_LOGS, "An error occured while opening the file [%s].\n", file);
 		return NULL;
 	}
 
@@ -206,11 +209,17 @@ stringFragment* getCSVHeader(csv* data, int col) {
 }
 
 matrix* extractMatrixFromCSV(csv* data, int topRow, int leftCol, int wide, int high) {
-	if ((data->rows < (high + topRow)) || (data->cols < (wide + leftCol))) {
+	if (data->rows < (high + topRow)) {
+		PRINT_FLUSH(CSV_INCLUDE_ERROR_LOGS, "CSV has %d rows thus it can not extract row at index %d.\n", data->rows, high + topRow);
+		return NULL;
+	}
+	if (data->cols < (wide + leftCol)) {
+		PRINT_FLUSH(CSV_INCLUDE_ERROR_LOGS, "CSV has %d columns thus it can not extract column at index %d.\n", data->cols, wide + leftCol);
 		return NULL;
 	}
 	matrix* mat = createMatrix(high, wide);
 	if (!mat) {
+		PRINT_FLUSH(CSV_INCLUDE_ERROR_LOGS, "An error occured while allocating Matrix for CSV.\n");
 		return NULL;
 	}
 
@@ -221,6 +230,8 @@ matrix* extractMatrixFromCSV(csv* data, int topRow, int leftCol, int wide, int h
 			netF val = getCSVCelAsNetF(data, yn + topRow, xn + leftCol);
 			if (isnan(val)){
 				deleteMatrix(mat);
+				stringFragment* frag = getCSVCel(data, yn + topRow, xn + leftCol);
+				PRINT_FLUSH(CSV_INCLUDE_ERROR_LOGS, "The value at row index %d column index %d has a value [%.*s] which is not a number.", yn + topRow, xn + leftCol, (int)frag->length, frag->start);
 				return NULL;
 			} else {
 				setMatrixVal(mat, yn, xn, val);

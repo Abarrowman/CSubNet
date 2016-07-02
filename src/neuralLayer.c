@@ -16,7 +16,7 @@ static __inline void applyBiases(netF* __restrict vals, netF* __restrict biases,
 	int row;
 	int col;
 	int idx;
-	#pragma omp parallel for default(shared) private(row, col, idx) schedule(static)
+	//#pragma omp parallel for default(shared) private(row, col, idx) schedule(static)
 	for (row = 0; row < outHigh; row++) {
 		for (col = 0; col < outWide; col++) {
 			idx = col + row * outWide;

@@ -60,8 +60,8 @@ matrix* applyNetwork(neuralNetwork* network, matrix* input, matrix* output, matr
 }
 
 static netF determineAcceptanceThreshold(netF temp, netF oldErr, netF newErr) {
-	//return expf((oldErr - newErr) * 500 / temp);
-	return exp((oldErr - newErr) * 500 / temp);
+	return expf((oldErr - newErr) * 500 / temp);
+	//return exp((oldErr - newErr) * 500 / temp);
 }
 
 static netF calculateTrainingDataError(neuralNetwork* network, trainingData* trains, matrix* output, matrix* intermediates) {
@@ -185,10 +185,10 @@ neuralNetwork* swarmOptimizeNetwork(neuralNetwork* original, trainingData* train
 
 	int numParticles = 100;
 	netF searchArea = 20;
-	netF friction = 0.7;
+	netF friction = 0.7f;
 	netF startAttraction = 1;
 	netF bestAttraction = 2;
-	int maxCycles = 5000000;
+	int maxCycles = 500000;//5000000;
 
 
 	int paramCount = countNetworkParameters(original);
@@ -248,6 +248,7 @@ neuralNetwork* swarmOptimizeNetwork(neuralNetwork* original, trainingData* train
 	}
 	deleteVector(temp);
 
+	PRINT_FLUSH(1, "Cycle %d Initial %f Best %f \n", cycle, initialError, bestStateError)
 
 	for (n = 0; n < numParticles; n++) {
 		deleteNetwork(particles[n]);
@@ -268,7 +269,7 @@ neuralNetwork* swarmOptimizeNetwork(neuralNetwork* original, trainingData* train
 neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train) {
 	START_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates, initialError, bestStateError)
 
-	int maxCycles = 50000000;
+	int maxCycles = 500000;
 	netF initStepSize = 0.5;
 
 	int netFCount = countNetworkParameters(original);
@@ -291,7 +292,7 @@ neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train
 		//netF stepSize = initStepSize * exp(-7.0 * cycle / maxCycles) + 0.001; //3 -> 40379
 		//netF stepSize = initStepSize * exp(-9.5 * cycle / maxCycles) + 0.001; //  3 -> ? 40427
 		//netF stepSize = initStepSize * exp(-13.0 * cycle / maxCycles) + 0.001; //  3 -> 40507
-		netF stepSize = 0.1; //3 -> ???
+		netF stepSize = 0.1f; //3 -> ???
 
 
 		copyNeuralNetwork(current, mutant);
@@ -358,7 +359,7 @@ neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train
 						bestStateError, currentStateError, mutantStateError)
 		}
 	}
-
+	PRINT_FLUSH(1, "Cycle %d Initial %f Best %f \n", cycle, initialError, bestStateError)
 	deleteVector(changeVector);
 	FINISH_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates)
 }
@@ -407,7 +408,7 @@ neuralNetwork* annealNetwork(neuralNetwork* original, trainingData* train) {
 
 	int cycle;
 	for (cycle = 0; cycle < maxCycles; cycle++) {
-		temp = initialTemp * exp(-3.5f * cycle / cooldownCycles);
+		temp = initialTemp * expf(-3.5f * cycle / cooldownCycles);
 		copyNeuralNetwork(current, mutant);
 		mutateNetwork(mutant, 1.0f);//(1.0f + temp) / 2.0f);
 

@@ -2,12 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <float.h>
+#include <time.h>
 #include "coreDefs.h"
 #include "matrix.h"
 #include "neuralNetwork.h"
 #include "trainingData.h"
 #include "utils.h"
 #include "csv.h"
+#include "clUtils.h"
 
 #define MAX_NETWORK_SIZES (10)
 
@@ -25,7 +27,7 @@ void help() {
 		"Rounds: -r=n\n"
 		"Layer Sizes: -s=v,w,x,y,z\n"
 		"Label Columns: -l=x\n"
-		"Algorithm: -a=[anneal,evolve,gradient]\n")
+		"Algorithm: -a=[anneal,evolve,gradient,swarm]\n")
 		system("pause");
 }
 
@@ -167,7 +169,7 @@ int train(int paramCount, char** params) {
 	}
 
 	OPTIMIZE_NETWORK(optimalNetwork, network, trainDataPtr, alg)
-
+	//printNeuralNetwork(optimalNetwork);
 	stringFragment encoded = encodeNeuralNetwork(optimalNetwork);
 	int errCode = 0;
 	if (!writeFileFromMemory(outputNetFile, encoded)) {
@@ -372,28 +374,79 @@ int execute(int paramCount, char** params) {
 	return errCode;
 }
 
+int noArgs() {
+	help();
+	return 1;
+	/*PRINT_FLUSH(1, "No Args Supplied\n");
+	int loops = 10000;
+	int leftHeight = 60;
+	int rightHeight = 60;
+	int leftWidth = 60;
+
+	matrix* a = createIdentityMatrix(leftHeight, leftWidth);
+	a->vals[0] = 2;
+	matrix* b = createIdentityMatrix(rightHeight, leftWidth);
+	b->vals[0] = 2;
+	matrix* c = createMatrix(leftHeight, rightHeight);
+
+	int n;
+	printf("Start Up Complete\n");
+	clock_t start = clock();
+	for (n = 0; n < loops; n++) {
+		gpuTransMultiplyMatrices(a, b, c);
+	}
+	clock_t end = clock();
+	printf("GPU Complete %dms\n", end - start);
+	start = clock();
+	for (n = 0; n < loops; n++) {
+		cpuTransMultiplyMatrices(a, b, c);
+	}
+	end = clock();
+	printf("CPU Complete %dms\n", end - start);
+
+	printf("%f\n", c->vals[0]);
+
+	deleteMatrix(a);
+	deleteMatrix(b);
+	deleteMatrix(c);
+
+	system("pause");
+	return 0;*/
+}
+
+
+//-t -l=1 -a=swarm "E:\A\Dropbox\Dev\Multiple\SubNet\test\test-experiment\rated.csv" 19 "E:\A\Dropbox\Dev\Multiple\SubNet\test\test-experiment\network.net"
 int main(int argc, char *argv[]) {
+	clock_t start = clock();
 	int n;
 	for (n = 0; n < argc; n++) {
-		PRINT_FLUSH(1, "Argument %d [%s]\n", n, argv[n])
+		//PRINT_FLUSH(1, "Argument %d [%s]\n", n, argv[n])
+		PRINT_FLUSH(1, "\"%s\" ", argv[n])
 	}
-
+	PRINT_FLUSH(1, "\n")
+	int result;
+	clInit();
 	if (argc < 2) {
-		help();
-		return 1;
-	}
-	char* command = argv[1];
-	if (strcmp(command, "-t") == 0) {
-		return train(argc - 2, &argv[2]);
-	} else if (strcmp(command, "-r") == 0) {
-		return reTrain(argc - 2, &argv[2]);
-	} else if (strcmp(command, "-e") == 0) {
-		return execute(argc - 2, &argv[2]);
+		noArgs();
+		result = 1;
 	} else {
-		help();
-		if (strcmp(command, "-h") == 0) {
-			return 0;
+		char* command = argv[1];
+		if (strcmp(command, "-t") == 0) {
+			result = train(argc - 2, &argv[2]);
+		} else if (strcmp(command, "-r") == 0) {
+			result = reTrain(argc - 2, &argv[2]);
+		} else if (strcmp(command, "-e") == 0) {
+			result = execute(argc - 2, &argv[2]);
+		} else {
+			help();
+			if (strcmp(command, "-h") == 0) {
+				result = 1;
+			}
+			result = 0;
 		}
-		return 1;
 	}
+	clEnd();
+	clock_t end = clock();
+	PRINT_FLUSH(1, "Duration %dms\n", end - start);
+	return result;
 }

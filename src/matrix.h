@@ -35,11 +35,13 @@ matrix* setMatrixValues(matrix *mat, netF *dubs);
 
 //algebra
 matrix* multiplyMatrices(matrix* left, matrix *right, matrix* result);
-matrix* transMultiplyMatrices(matrix* left, matrix *right, matrix* result);
 matrix* subtractMatrices(matrix* left, matrix* right, matrix* result);
 matrix* addMatrices(matrix* left, matrix* right, matrix* result);
 netF sumSquareMatrix(matrix* mat);
 
+matrix* transMultiplyMatrices(matrix* left, matrix *right, matrix* result);
+matrix* cpuTransMultiplyMatrices(matrix* left, matrix *right, matrix* result);
+matrix* gpuTransMultiplyMatrices(matrix* left, matrix *right, matrix* result);
 
 //misc
 matrix* writeMatrix(FILE *stream, matrix* mat, char colSep, char rowSep);
