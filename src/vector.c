@@ -1,6 +1,7 @@
 #include "vector.h"
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 vector* createVector(size_t length) {
 	vector* vec = malloc(sizeof(vector));
@@ -128,4 +129,17 @@ void deleteVector(vector* vec) {
 	free(vec->vals);
 	vec->vals = NULL;
 	free(vec);
+}
+
+int doesVectorHaveNANs(vector* vec) {
+	if (vec == NULL) {
+		return 1;
+	}
+	int i;
+	for (i = 0; i < vec->length; i++) {
+		if (isnan(vec->vals[i])) {
+			return 1;
+		}
+	}
+	return 0;
 }

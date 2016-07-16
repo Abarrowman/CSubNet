@@ -7,32 +7,57 @@
 #include "utils.h"
 
 __inline netF layerSigmoid(netF input) {
-		//return 1 / (1 + exp(-input));
-		//return (input / (1 + fabsf(input)) + 1) / 2;
-		return (input / (1 + fabs(input)) + 1) / 2;
+	return (input / (1 + fabs(input)) + 1) / 2;
 }
-	
+
+__inline netF layerSigmoidDerivative(netF input) {
+	netF denom = (fabs(input) + 1);
+	return 1 / (2 * denom * denom);
+}
+
+static __inline void applySigmoidDerivative(netF* __restrict vals, int count) {
+	int idx;
+	for (idx = 0; idx < count; idx++) {
+		vals[idx] = layerSigmoidDerivative(vals[idx]);
+	}
+}
+
+matrix* calculateLayerOutputDerrivative(neuralLayer* layer, matrix* preOutput) {
+	applySigmoidDerivative(preOutput->vals, preOutput->width * preOutput->height);
+	return preOutput;
+}
+
 static __inline void applyBiases(netF* __restrict vals, netF* __restrict biases, const int outHigh, const int outWide) {
 	int row;
 	int col;
 	int idx;
-	//#pragma omp parallel for default(shared) private(row, col, idx) schedule(static)
 	for (row = 0; row < outHigh; row++) {
 		for (col = 0; col < outWide; col++) {
 			idx = col + row * outWide;
-			vals[idx] = layerSigmoid(vals[idx] - biases[col]);
+			vals[idx] = vals[idx] - biases[col];
 		}
 	}
 }
 
-matrix* applyLayer(neuralLayer* layer, matrix* input, matrix* output, int applySigmoid) {
+static __inline void applySigmoid(netF* __restrict vals, int count) {
+	int idx;
+	for (idx = 0; idx < count; idx++) {
+		vals[idx] = layerSigmoid(vals[idx]);
+	}
+}
+
+matrix* applyLayer(neuralLayer* layer, matrix* input, matrix* output, int shouldApplySigmoid, matrix* preOutput) {
 	transMultiplyMatrices(input, layer->matrix, output);
 
 	if (output == NULL) {
 		return NULL;
+	}		
+	applyBiases(output->vals, layer->biases, output->height, output->width);
+	if (preOutput) {
+		cloneMatrix(output, preOutput);
 	}
-	if (applySigmoid) {
-		applyBiases(output->vals, layer->biases, output->height, output->width);
+	if (shouldApplySigmoid) {
+		applySigmoid(output->vals, output->height * output->width);
 	}
 	return output;
 }

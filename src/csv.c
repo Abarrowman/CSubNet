@@ -210,11 +210,11 @@ stringFragment* getCSVHeader(csv* data, int col) {
 
 matrix* extractMatrixFromCSV(csv* data, int topRow, int leftCol, int wide, int high) {
 	if (data->rows < (high + topRow)) {
-		PRINT_FLUSH(CSV_INCLUDE_ERROR_LOGS, "CSV has %d rows thus it can not extract row at index %d.\n", data->rows, high + topRow);
+		PRINT_FLUSH(CSV_INCLUDE_ERROR_LOGS, "CSV has %d rows thus it can not extract row at index %d.\n", data->rows, high + topRow - 1);
 		return NULL;
 	}
 	if (data->cols < (wide + leftCol)) {
-		PRINT_FLUSH(CSV_INCLUDE_ERROR_LOGS, "CSV has %d columns thus it can not extract column at index %d.\n", data->cols, wide + leftCol);
+		PRINT_FLUSH(CSV_INCLUDE_ERROR_LOGS, "CSV has %d columns thus it can not extract column at index %d.\n", data->cols, wide + leftCol - 1);
 		return NULL;
 	}
 	matrix* mat = createMatrix(high, wide);

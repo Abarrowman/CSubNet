@@ -35,5 +35,7 @@ vector* fillVectorZero(vector* vec);
 
 void deleteVector(vector* vec);
 
+int doesVectorHaveNANs(vector* vec);
+
 #endif
 #pragma once

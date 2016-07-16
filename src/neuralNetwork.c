@@ -49,10 +49,10 @@ matrix* applyNetwork(neuralNetwork* network, matrix* input, matrix* output, matr
 	matrix* inter;
 	for (idx = 0; idx < network->numLayers - 1; idx++) {
 		inter = intermediates + idx;
-		applyLayer(network->layers[idx], old, inter , 1);
+		applyLayer(network->layers[idx], old, inter , 1, NULL);
 		old = inter;
 	}
-	applyLayer(network->layers[idx], old, output, 1);
+	applyLayer(network->layers[idx], old, output, 1, NULL);
 	if (needsIntermediates) {
 		deleteIntermediates(intermediates, network);
 	}
@@ -60,14 +60,14 @@ matrix* applyNetwork(neuralNetwork* network, matrix* input, matrix* output, matr
 }
 
 static netF determineAcceptanceThreshold(netF temp, netF oldErr, netF newErr) {
-	return expf((oldErr - newErr) * 500 / temp);
+	return expf((oldErr - newErr) * 50 / temp);
 	//return exp((oldErr - newErr) * 500 / temp);
 }
 
 static netF calculateTrainingDataError(neuralNetwork* network, trainingData* trains, matrix* output, matrix* intermediates) {
 	applyNetwork(network, trains->input, output, intermediates);
 	subtractMatrices(output, trains->output, output);
-	return sumSquareMatrix(output) / (output->height * output->width);
+	return sqrtf(sumSquareMatrix(output) / (output->height * output->width));
 }
 
 static neuralNetwork* mutateNetwork(neuralNetwork* mutant, netF mutationSize) {
@@ -101,7 +101,7 @@ neuralNetwork* mutant = cloneNeuralNetwork(original); \
 matrix* output = createMatrix(train->output->height, getNetworkOutputs(original)); \
 matrix* intermediates = createNetworkIntermediates(original, getTrainingDataCount(train)); \
 netF initialError = calculateTrainingDataError(original, train, output, intermediates); \
-PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Initial %f\n", initialError) \
+PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Initial %f%%\n", initialError * 100) \
 netF bestStateError = initialError;
 
 #define FINISH_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates) \
@@ -175,24 +175,172 @@ static vector* networkAsVector(neuralNetwork* net) {
 	return copyNetworkToVector(net, vec);
 }
 
-neuralNetwork* swarmOptimizeNetwork(neuralNetwork* original, trainingData* train) {
+netOptSettings* initNetOptSettings(netOptSettings* settings) {
+	settings->algorithm = 0;
+	settings->maxRounds = 500000;
+	settings->coolRounds = 150000;
+	settings->particleCount = 100;
+	settings->childCount = 1000;
+	return settings;
+}
+
+neuralNetwork* optimizeNetwork(neuralNetwork* original, trainingData* train, netOptSettings* settings) {
+	int alg = settings->algorithm;
+	if (alg == 0) {
+		return annealNetwork(original, train, settings);
+	} else if (alg == 1) {
+		return evolveNetwork(original, train, settings);
+	} else if (alg == 2) {
+		return gradientClimbNetwork(original, train, settings);
+	} else if (alg == 3) {
+		return swarmOptimizeNetwork(original, train, settings);
+	} else if (alg == 4) {
+		return backPropNetwork(original, train, settings);
+	} else {
+		PRINT_FLUSH(1, "Unknown algorithm [%d]\n", settings->algorithm);
+		return NULL;
+	}
+}
+
+matrix* applyNetworkForBackprop(neuralNetwork* network, matrix* input, matrix* output, matrix* intermediates, matrix* preOuts) {
+	int idx;
+	matrix* old = input;
+	matrix* inter;
+	for (idx = 0; idx < network->numLayers - 1; idx++) {
+		inter = intermediates + idx;
+		applyLayer(network->layers[idx], old, inter, 1, preOuts + idx);
+		old = inter;
+	}
+	applyLayer(network->layers[idx], old, output, 1, preOuts + idx);
+	return output;
+}
+
+neuralNetwork* backPropNetwork(neuralNetwork* original, trainingData* train, netOptSettings* settings) {
+	neuralNetwork* current = cloneNeuralNetwork(original);
+	matrix* output = createMatrix(train->output->height, getNetworkOutputs(original));
+	matrix* extra = createMatrix(train->output->height, getNetworkOutputs(original));
+	matrix* intermediates = createNetworkIntermediates(original, getTrainingDataCount(train));
+
+	
+	int numLayers = original->numLayers;
+	int numTrains = getTrainingDataCount(train);
+	int paramCount = countNetworkParameters(original);
+	vector* changeVector = createVector(paramCount);
+
+	int n;
+	neuralLayer* layer;
+
+	matrix* layerErrors = malloc(sizeof(matrix) * numLayers);
+	matrix* weightDers = malloc(sizeof(matrix) * numLayers);
+	matrix* layerExtras = malloc(sizeof(matrix) * numLayers);
+	for (n = 0; n < numLayers; n++) {
+		initMatrix(layerExtras + n, numTrains, getLayerOutputs(original->layers[n]));
+		initMatrix(layerErrors + n, numTrains, getLayerOutputs(original->layers[n]));
+		initMatrix(weightDers + n, numTrains, getLayerOutputs(original->layers[n]) * getLayerInputs(original->layers[n]));
+	}
+
+	netF initialError;
+	netF rmsError;
+	int round;
+	for (round = 0; round < settings->maxRounds; round++) {
+		applyNetworkForBackprop(current, train->input, output, intermediates, layerErrors);
+		subtractMatrices(output, train->output, extra);
+		netF error = sumSquareMatrix(extra) / (2 * extra->height * extra->width);
+		rmsError = sqrtf(error * 2);
+		if (round == 0) {
+			initialError = rmsError;
+			PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Initial %f%%\n", initialError * 100)
+		} else if (round % 1000 == 0){
+			PRINT_FLUSH(1, "Cycle %d Initial %f%% Current %f%% \n", round, initialError * 100, rmsError * 100)
+		}
+
+		matrix* layExtra = layerExtras + (numLayers - 1);
+		subtractMatrices(output, train->output, layExtra);
+		matrix* layerEr = layerErrors + (numLayers - 1);
+		layer = current->layers[current->numLayers - 1];
+		elementMultMatrices(layExtra, calculateLayerOutputDerrivative(layer, layerEr), layerEr);
+
+		for (n = numLayers - 2; n >= 0; n--) {
+			layExtra = layerExtras + n;
+			//layer and layerEr are referring to the next layer
+			multiplyMatrices(layerEr, layer->matrix, layExtra);
+			layerEr = layerErrors + n;
+			layer = current->layers[n];
+			elementMultMatrices(layExtra, calculateLayerOutputDerrivative(layer, layerEr), layerEr);
+		}
+
+		int changeIdx = 0;
+		for (n = 0; n < numLayers; n++) {
+			layerEr = layerErrors + n;
+			matrix* weightDer = weightDers + n;
+			if (n == 0) {
+				expandMultMatrices(layerEr, train->input, weightDer);
+			} else {
+				expandMultMatrices(layerEr, intermediates + (n - 1), weightDer);
+			}
+			//these averages are slow and could be made faster
+			//weights
+			int col;
+			for (col = 0; col < weightDer->width; col++) {
+				int row;
+				netF sum = 0;
+				for (row = 0; row < weightDer->height; row++) {
+					sum += *getMatrixVal(weightDer, row, col);
+				}
+				changeVector->vals[changeIdx] = sum / weightDer->height;
+				changeIdx++;
+			}
+			//biases
+			for (col = 0; col < layerEr->width; col++) {
+				int row;
+				netF sum = 0;
+				for (row = 0; row < layerEr->height; row++) {
+					sum += *getMatrixVal(layerEr, row, col);
+				}
+				changeVector->vals[changeIdx] = -sum / layerEr->height;
+				changeIdx++;
+			}
+		}
+		multiplyVectorSelf(changeVector, -0.5f);
+		addVectorToNetwork(changeVector, current);
+	}
+	PRINT_FLUSH(1, "Cycle %d Initial %f%% Best %f%% \n", round, initialError * 100, rmsError * 100)
+
+	deleteVector(changeVector);
+	for (n = 0; n < numLayers; n++) {
+		clearMatrix(layerErrors + n);
+		clearMatrix(layerExtras + n);
+		clearMatrix(weightDers + n);
+	}
+	free(layerExtras);
+	free(weightDers);
+	free(layerErrors);
+	deleteIntermediates(intermediates, original);
+	deleteMatrix(output);
+	deleteMatrix(extra);
+	return current;
+}
+
+neuralNetwork* swarmOptimizeNetwork(neuralNetwork* original, trainingData* train, netOptSettings* settings) {
 	neuralNetwork* best = cloneNeuralNetwork(original);
 	matrix* output = createMatrix(train->output->height, getNetworkOutputs(original));
 	matrix* intermediates = createNetworkIntermediates(original, getTrainingDataCount(train));
 	netF initialError = calculateTrainingDataError(original, train, output, intermediates);
-	PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Initial %f\n", initialError)
+	PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Initial %f%%\n", initialError * 100)
 	netF bestStateError = initialError;
 
-	int numParticles = 100;
 	netF searchArea = 20;
 	netF friction = 0.7f;
 	netF startAttraction = 1;
 	netF bestAttraction = 2;
-	int maxCycles = 500000;//5000000;
+	int maxCycles = settings->maxRounds;
 
 
 	int paramCount = countNetworkParameters(original);
 	vector* bestLoc = copyNetworkToVector(original, createVector(paramCount));
+
+	int numParticles = settings->particleCount;
+
 
 	//consider using a struct instead
 	neuralNetwork** particles = malloc(sizeof(neuralNetwork*) * numParticles);
@@ -242,13 +390,13 @@ neuralNetwork* swarmOptimizeNetwork(neuralNetwork* original, trainingData* train
 			copyVector(location, bestLoc);
 		}
 		if (cycle % 10000 == 0) {
-			PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Cycle %d Best %f Mut %f\n", cycle,
-				bestStateError, mutantStateError)
+			PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Cycle %d Best %f%% Mut %f%%\n", cycle,
+				bestStateError * 100, mutantStateError * 100)
 		}
 	}
 	deleteVector(temp);
 
-	PRINT_FLUSH(1, "Cycle %d Initial %f Best %f \n", cycle, initialError, bestStateError)
+	PRINT_FLUSH(1, "Cycle %d Initial %f%% Best %f%% \n", cycle, initialError * 100, bestStateError * 100)
 
 	for (n = 0; n < numParticles; n++) {
 		deleteNetwork(particles[n]);
@@ -266,10 +414,10 @@ neuralNetwork* swarmOptimizeNetwork(neuralNetwork* original, trainingData* train
 	return best;
 }
 
-neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train) {
+neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train, netOptSettings* settings) {
 	START_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates, initialError, bestStateError)
 
-	int maxCycles = 500000;
+	int maxCycles = settings->maxRounds;
 	netF initStepSize = 0.5;
 
 	int netFCount = countNetworkParameters(original);
@@ -355,20 +503,20 @@ neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train
 			}
 		}
 		if (cycle % 10000 == 0) {
-			PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Cycle %d Step Size %f Best %f Curr %f Mut %f\n", cycle, stepSize,
-						bestStateError, currentStateError, mutantStateError)
+			PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Cycle %d Step Size %f Best %f%% Curr %f%% Mut %f%%\n", cycle, stepSize,
+						bestStateError * 100, currentStateError * 100, mutantStateError * 100)
 		}
 	}
-	PRINT_FLUSH(1, "Cycle %d Initial %f Best %f \n", cycle, initialError, bestStateError)
+	PRINT_FLUSH(1, "Cycle %d Initial %f%% Best %f%% \n", cycle, initialError * 100, bestStateError * 100)
 	deleteVector(changeVector);
 	FINISH_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates)
 }
 
-neuralNetwork* evolveNetwork(neuralNetwork* original, trainingData* train) {
+neuralNetwork* evolveNetwork(neuralNetwork* original, trainingData* train, netOptSettings* settings) {
 	START_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates, initialError, bestStateError)
 
-	int maxCycles = 500000;
-	int evolutionCycles = 1000;
+	int maxCycles = settings->maxRounds;
+	int childrenPerGeneration = settings->childCount;
 
 	int cycle;
 	for (cycle = 0; cycle < maxCycles; cycle++) {
@@ -381,24 +529,24 @@ neuralNetwork* evolveNetwork(neuralNetwork* original, trainingData* train) {
 			bestStateError = mutantStateError;
 			copyNeuralNetwork(mutant, best);
 		}
-		if (cycle % evolutionCycles == 0) {
+		if (cycle % childrenPerGeneration == 0) {
 			copyNeuralNetwork(best, current);
 		}
 		if (cycle % 10000 == 0) {
-			PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Cycle %d Best %f Mut %f\n", cycle, bestStateError, mutantStateError)
+			PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Cycle %d Best %f%% Mut %f%%\n", cycle, bestStateError * 100, mutantStateError * 100)
 		}
 	}	
 	
-	PRINT_FLUSH(1, "Cycle %d Initial %f Best %f \n", cycle, initialError, bestStateError)
+	PRINT_FLUSH(1, "Cycle %d Initial %f%% Best %f%% \n", cycle, initialError * 100, bestStateError * 100)
 
 	FINISH_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates)
 }
 
-neuralNetwork* annealNetwork(neuralNetwork* original, trainingData* train) {
+neuralNetwork* annealNetwork(neuralNetwork* original, trainingData* train, netOptSettings* settings) {
 	START_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates, initialError, bestStateError)
 
-	int maxCycles = 500000;
-	int cooldownCycles = 50000;
+	int maxCycles = settings->maxRounds;
+	int cooldownCycles = settings->coolRounds;
 	netF initialTemp = 5;
 	netF temp = initialTemp;
 	int cyclesWorse = 0;
@@ -433,12 +581,12 @@ neuralNetwork* annealNetwork(neuralNetwork* original, trainingData* train) {
 		}
 
 		if (cycle % 10000 == 0) {
-			PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Cycle %d Temp %f Best %f Curr %f Mut %f\n", cycle, temp,
-					bestStateError, currentStateError, mutantStateError)
+			PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Cycle %d Temp %f Best %f%% Curr %f%% Mut %f%%\n", cycle, temp,
+					bestStateError * 100, currentStateError * 100, mutantStateError * 100)
 		}
 	}
 
-	PRINT_FLUSH(1, "Cycle %d Initial %f Best %f \n", cycle, initialError, bestStateError)
+	PRINT_FLUSH(1, "Cycle %d Initial %f%% Best %f%% \n", cycle, initialError * 100, bestStateError * 100)
 
 	FINISH_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates)
 }

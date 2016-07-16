@@ -13,12 +13,31 @@ typedef struct neuralNetworkStub {
 	int numLayers;
 } neuralNetwork;
 
+struct netOptSettingsStub;
+typedef struct netOptSettingsStub {
+	//general
+	int maxRounds;
+	int algorithm;
+	//annealing
+	int coolRounds;
+	//swarm
+	int particleCount;
+	//evolution
+	int childCount;
+} netOptSettings;
+
+netOptSettings* initNetOptSettings(netOptSettings* settings);
+
+
 matrix* applyNetwork(neuralNetwork* network, matrix* input, matrix* output, matrix* intermediates);
 
-neuralNetwork* swarmOptimizeNetwork(neuralNetwork* original, trainingData* train);
-neuralNetwork* annealNetwork(neuralNetwork* original, trainingData* train);
-neuralNetwork* evolveNetwork(neuralNetwork* original, trainingData* train);
-neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train);
+neuralNetwork* optimizeNetwork(neuralNetwork* original, trainingData* train, netOptSettings* settings);
+
+neuralNetwork* backPropNetwork(neuralNetwork* original, trainingData* train, netOptSettings* settings);
+neuralNetwork* swarmOptimizeNetwork(neuralNetwork* original, trainingData* train, netOptSettings* settings);
+neuralNetwork* annealNetwork(neuralNetwork* original, trainingData* train, netOptSettings* settings);
+neuralNetwork* evolveNetwork(neuralNetwork* original, trainingData* train, netOptSettings* settings);
+neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train, netOptSettings* settings);
 
 neuralNetwork* createEmptyNetwork(int numLayers);
 neuralNetwork* createSizedNetwork(int* sizes, int numLayers);

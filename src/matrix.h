@@ -38,6 +38,9 @@ matrix* multiplyMatrices(matrix* left, matrix *right, matrix* result);
 matrix* subtractMatrices(matrix* left, matrix* right, matrix* result);
 matrix* addMatrices(matrix* left, matrix* right, matrix* result);
 netF sumSquareMatrix(matrix* mat);
+matrix* elementMultMatrices(matrix* left, matrix *right, matrix* result);
+matrix* expandMultMatrices(matrix* left, matrix *right, matrix* result);
+
 
 matrix* transMultiplyMatrices(matrix* left, matrix *right, matrix* result);
 matrix* cpuTransMultiplyMatrices(matrix* left, matrix *right, matrix* result);
@@ -47,7 +50,7 @@ matrix* gpuTransMultiplyMatrices(matrix* left, matrix *right, matrix* result);
 matrix* writeMatrix(FILE *stream, matrix* mat, char colSep, char rowSep);
 void writeMatrixRow(FILE *stream, matrix* mat, char colSep, char rowSep, int row);
 matrix* printMatrix(matrix* mat);
-
+int doesMatrixHaveNANs(matrix* mat);
 
 
 #endif

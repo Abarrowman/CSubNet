@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include "utils.h"
 #include "trainingData.h"
 #include "matrix.h"
 #include "csv.h"
@@ -16,11 +17,6 @@ void clearTrainingData(trainingData* data) {
 trainingData* readTrainingData(trainingData* data, char* file, int inputCols, int labelCols) {
 	csv* csvData =  readCSV(file);
 	if (csvData == NULL) {
-		return NULL;
-	}
-
-	if (csvData->cols - labelCols <= inputCols) {
-		deleteCSV(csvData);
 		return NULL;
 	}
 

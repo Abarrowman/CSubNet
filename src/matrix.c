@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <CL/opencl.h>
+#include <math.h>
 #include "matrix.h"
 #include "utils.h"
 #include "clUtils.h"
@@ -133,6 +134,47 @@ matrix* multiplyMatrices(matrix* left, matrix* right, matrix* result) {
 	return mat;
 }
 
+matrix* elementMultMatrices(matrix* left, matrix* right, matrix* result) {
+	int leftWidth = left->width;
+	int leftHeight = left->height;
+	int rightWidth = right->width;
+	int rightHeight = right->height;
+	if ((leftWidth != rightWidth) || (leftHeight != rightHeight)) {
+		return NULL;
+	}
+	matrix* mat = createOrUseSuppliedMatrix(result, leftHeight, leftWidth);
+	netF* vals = mat->vals;
+	int idx;
+	for (idx = 0; idx < leftWidth * leftHeight; idx++) {
+		mat->vals[idx] = left->vals[idx] * right->vals[idx];
+	}
+	return mat;
+}
+
+matrix* expandMultMatrices(matrix* left, matrix* right, matrix* result) {
+	int leftWidth = left->width;
+	int leftHeight = left->height;
+	int rightWidth = right->width;
+	int rightHeight = right->height;
+	if (leftHeight != rightHeight) {
+		return NULL;
+	}
+	int totalWidth = leftWidth * rightWidth;
+	matrix* mat = createOrUseSuppliedMatrix(result, leftHeight, totalWidth);
+	netF* vals = mat->vals;
+	int row;
+	for (row = 0; row < leftHeight; row++) {
+		int leftCol;
+		for (leftCol = 0; leftCol < leftWidth; leftCol++) {
+			int rightCol;
+			for (rightCol = 0; rightCol < rightWidth; rightCol++) {
+				mat->vals[row * totalWidth + leftCol * rightWidth + rightCol] =
+					left->vals[row * leftWidth + leftCol] * right->vals[row * rightWidth + rightCol];
+			}
+		}
+	}
+	return mat;
+}
 
 
 static __inline netF dotProduct(netF* left, netF* right, const int count) {
@@ -373,4 +415,17 @@ matrix* agumentMatrix(matrix* left, matrix* right, matrix* result) {
 		}
 	}
 	return mat;
+}
+
+int doesMatrixHaveNANs(matrix* mat) {
+	if (mat == NULL) {
+		return 1;
+	}
+	int i;
+	for (i = 0; i < mat->width * mat->height; i++) {
+		if (isnan(mat->vals[i])) {
+			return 1;
+		}
+	}
+	return 0;
 }

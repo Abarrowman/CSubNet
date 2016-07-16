@@ -11,7 +11,9 @@ typedef struct neuralLayerStub {
 	netF* biases;
 } neuralLayer;
 
-matrix* applyLayer(neuralLayer* layer, matrix* input, matrix* output, int applySigmoid);
+matrix* calculateLayerOutputDerrivative(neuralLayer* layer, matrix* preOutput);
+
+matrix* applyLayer(neuralLayer* layer, matrix* input, matrix* output, int applySigmoid, matrix* preOutput);
 
 neuralLayer* cloneLayer(neuralLayer* original, neuralLayer* result);
 
