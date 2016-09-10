@@ -96,8 +96,13 @@ netF* getMatrixVal(matrix* mat, int row, int col) {
 }
 
 static matrix* createOrUseSuppliedMatrix(matrix* supplied, int height, int width) {
-	if ((supplied == NULL) || (supplied->width != width) || (supplied->height != height)) {
+	if (supplied == NULL) {
 		return createMatrix(height, width);
+	} else if ((supplied->width != width) || (supplied->height != height)) {
+		PRINT_FLUSH(1, "Supplied matrix is of the wrong size %dx%d instead of %dx%d",
+			supplied->height, supplied->width, height, width);
+		exit(1);
+		return NULL;
 	} else {
 		return supplied;
 	}
