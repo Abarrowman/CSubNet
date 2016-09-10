@@ -236,7 +236,7 @@ neuralNetwork* backPropNetwork(neuralNetwork* original, trainingData* train, net
 	for (n = 0; n < numLayers; n++) {
 		initMatrix(layerExtras + n, numTrains, getLayerOutputs(original->layers[n]));
 		initMatrix(layerErrors + n, numTrains, getLayerOutputs(original->layers[n]));
-		initMatrix(weightDers + n, numTrains, getLayerOutputs(original->layers[n]) * getLayerInputs(original->layers[n]));
+		initMatrix(weightDers + n, 1, getLayerOutputs(original->layers[n]) * getLayerInputs(original->layers[n]));
 	}
 
 	netF initialError;
@@ -274,20 +274,15 @@ neuralNetwork* backPropNetwork(neuralNetwork* original, trainingData* train, net
 			layerEr = layerErrors + n;
 			matrix* weightDer = weightDers + n;
 			if (n == 0) {
-				expandMultMatrices(layerEr, train->input, weightDer);
+				expandMultCollapseMatrices(layerEr, train->input, weightDer);
 			} else {
-				expandMultMatrices(layerEr, intermediates + (n - 1), weightDer);
+				expandMultCollapseMatrices(layerEr, intermediates + (n - 1), weightDer);
 			}
 			//these averages are slow and could be made faster
 			//weights
 			int col;
 			for (col = 0; col < weightDer->width; col++) {
-				int row;
-				netF sum = 0;
-				for (row = 0; row < weightDer->height; row++) {
-					sum += *getMatrixVal(weightDer, row, col);
-				}
-				changeVector->vals[changeIdx] = sum / weightDer->height;
+				changeVector->vals[changeIdx] = *getMatrixVal(weightDer, 0, col);
 				changeIdx++;
 			}
 			//biases

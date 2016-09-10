@@ -181,6 +181,36 @@ matrix* expandMultMatrices(matrix* left, matrix* right, matrix* result) {
 	return mat;
 }
 
+matrix* expandMultCollapseMatrices(matrix* left, matrix *right, matrix* result) {
+	int leftWidth = left->width;
+	int leftHeight = left->height;
+	int rightWidth = right->width;
+	int rightHeight = right->height;
+	if (leftHeight != rightHeight) {
+		return NULL;
+	}
+	int totalWidth = leftWidth * rightWidth;
+	matrix* mat = createOrUseSuppliedMatrix(result, 1, totalWidth);
+	fillMatrixZero(mat);
+	netF* vals = mat->vals;
+	int row;
+	for (row = 0; row < leftHeight; row++) {
+		int leftCol;
+		for (leftCol = 0; leftCol < leftWidth; leftCol++) {
+			int rightCol;
+			for (rightCol = 0; rightCol < rightWidth; rightCol++) {
+				mat->vals[leftCol * rightWidth + rightCol] +=
+					left->vals[row * leftWidth + leftCol] * right->vals[row * rightWidth + rightCol];
+			}
+		}
+	}
+	int col;
+	for (int col = 0; col < totalWidth; col++) {
+		mat->vals[col] /= leftHeight;
+	}
+	return mat;
+}
+
 
 static __inline netF dotProduct(netF* left, netF* right, const int count) {
 	netF sum = 0;

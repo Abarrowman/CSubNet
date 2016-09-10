@@ -39,7 +39,10 @@ matrix* subtractMatrices(matrix* left, matrix* right, matrix* result);
 matrix* addMatrices(matrix* left, matrix* right, matrix* result);
 netF sumSquareMatrix(matrix* mat);
 matrix* elementMultMatrices(matrix* left, matrix *right, matrix* result);
+
 matrix* expandMultMatrices(matrix* left, matrix *right, matrix* result);
+matrix* expandMultCollapseMatrices(matrix* left, matrix *right, matrix* result);
+
 
 
 matrix* transMultiplyMatrices(matrix* left, matrix *right, matrix* result);
