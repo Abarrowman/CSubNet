@@ -29,6 +29,7 @@ void clearMatrix(matrix* mat);
 //mutators
 matrix* fillMatrixZero(matrix* m);
 matrix* fillMatrixIdentity(matrix* m);
+matrix* fillMatrixRandom(matrix* m);
 matrix* setMatrixVal(matrix* mat, int row, int col, netF val);
 netF* getMatrixVal(matrix* mat, int row, int col);
 matrix* setMatrixValues(matrix *mat, netF *dubs);
@@ -42,6 +43,10 @@ matrix* elementMultMatrices(matrix* left, matrix *right, matrix* result);
 
 matrix* expandMultMatrices(matrix* left, matrix *right, matrix* result);
 matrix* expandMultCollapseMatrices(matrix* left, matrix *right, matrix* result);
+matrix* gpuExpandMultCollapseMatrices(matrix* left, matrix *right, matrix* result);
+
+
+matrix* transposeMatrix(matrix* original, matrix* result);
 
 
 

@@ -28,7 +28,7 @@ void help() {
 		"Layer Sizes: -s=v,w,x,y,z\n"
 		"Label Columns: -l=x\n"
 		"Algorithm: -a=[anneal,evolve,gradient,swarm]\n")
-		system("pause");
+	pauseLike();
 }
 
 #define ALGORITHM_OPTIONS(paramLen, param, optSettings) case 'a': \
@@ -385,46 +385,43 @@ int execute(int paramCount, char** params) {
 	return errCode;
 }
 
-int noArgs() {
-	help();
-	return 1;
-	/*PRINT_FLUSH(1, "No Args Supplied\n");
-	int loops = 10000;
-	int leftHeight = 60;
-	int rightHeight = 60;
-	int leftWidth = 60;
+int testCandidate(int candidate) {
+	int loops = 100;
+	int leftHeight = 1000;
+	int rightWidth = 1000;
+	int leftWidth = 1000;
 
-	matrix* a = createIdentityMatrix(leftHeight, leftWidth);
-	a->vals[0] = 2;
-	matrix* b = createIdentityMatrix(rightHeight, leftWidth);
-	b->vals[0] = 2;
-	matrix* c = createMatrix(leftHeight, rightHeight);
+	matrix* a = createMatrix(leftHeight, leftWidth);
+	fillMatrixRandom(a);
+
+	matrix* b = createMatrix(leftHeight, rightWidth);
+	fillMatrixRandom(b);
+
+	matrix* at = createMatrix(leftWidth, leftHeight);
+	matrix* bt = createMatrix(rightWidth, leftHeight);
+
+	matrix* c = createMatrix(1, leftWidth * rightWidth);
 
 	int n;
-	printf("Start Up Complete\n");
-	clock_t start = clock();
-	for (n = 0; n < loops; n++) {
-		gpuTransMultiplyMatrices(a, b, c);
+	if (candidate == 1) {
+		for (n = 0; n < loops; n++) {
+			transposeMatrix(a, at);
+			transposeMatrix(b, bt);
+			gpuExpandMultCollapseMatrices(at, bt, c);
+		}
+	} else if (candidate == 2) {
+		for (n = 0; n < loops; n++) {
+			expandMultCollapseMatrices(a, b, c);
+		}
 	}
-	clock_t end = clock();
-	printf("GPU Complete %dms\n", end - start);
-	start = clock();
-	for (n = 0; n < loops; n++) {
-		cpuTransMultiplyMatrices(a, b, c);
-	}
-	end = clock();
-	printf("CPU Complete %dms\n", end - start);
-
-	printf("%f\n", c->vals[0]);
 
 	deleteMatrix(a);
 	deleteMatrix(b);
 	deleteMatrix(c);
+	//deleteMatrix(d);
 
-	system("pause");
-	return 0;*/
+	return 0;
 }
-
 
 //-t -l=1 -a=swarm "E:\A\Dropbox\Dev\Multiple\SubNet\test\test-experiment\rated.csv" 19 "E:\A\Dropbox\Dev\Multiple\SubNet\test\test-experiment\network.net"
 int main(int argc, char *argv[]) {
@@ -438,7 +435,7 @@ int main(int argc, char *argv[]) {
 	int result;
 	clInit();
 	if (argc < 2) {
-		noArgs();
+		help();
 		result = 1;
 	} else {
 		char* command = argv[1];
@@ -448,6 +445,10 @@ int main(int argc, char *argv[]) {
 			result = reTrain(argc - 2, &argv[2]);
 		} else if (strcmp(command, "-e") == 0) {
 			result = execute(argc - 2, &argv[2]);
+		/*} else if (strcmp(command, "-c1") == 0) {
+			return 	testCandidate(1);
+		} else if (strcmp(command, "-c2") == 0) {
+			return testCandidate(2);*/
 		} else {
 			help();
 			if (strcmp(command, "-h") == 0) {
@@ -458,6 +459,6 @@ int main(int argc, char *argv[]) {
 	}
 	clEnd();
 	clock_t end = clock();
-	PRINT_FLUSH(1, "Duration %dms\n", end - start);
+	PRINT_FLUSH(1, "Duration %lfs\n", clocksToSeconds(start, end));
 	return result;
 }

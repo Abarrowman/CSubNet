@@ -1,7 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef __APPLE__
+#include <OpenCL/opencl.h>
+#else
 #include <CL/opencl.h>
+#endif
+
 #include <math.h>
 #include "matrix.h"
 #include "utils.h"
@@ -33,6 +39,14 @@ matrix* createMatrixWithValues(int height, int width, netF* vals) {
 
 matrix* fillMatrixZero(matrix* m) {
 	memset(m->vals, 0, sizeof(netF) * m->width * m->height);
+	return m;
+}
+
+matrix* fillMatrixRandom(matrix* m) {
+	int i;
+	for (i = 0; i < (m->width * m->height); i++) {
+		m->vals[i] = randomNetF();
+	}
 	return m;
 }
 
@@ -181,37 +195,6 @@ matrix* expandMultMatrices(matrix* left, matrix* right, matrix* result) {
 	return mat;
 }
 
-matrix* expandMultCollapseMatrices(matrix* left, matrix *right, matrix* result) {
-	int leftWidth = left->width;
-	int leftHeight = left->height;
-	int rightWidth = right->width;
-	int rightHeight = right->height;
-	if (leftHeight != rightHeight) {
-		return NULL;
-	}
-	int totalWidth = leftWidth * rightWidth;
-	matrix* mat = createOrUseSuppliedMatrix(result, 1, totalWidth);
-	fillMatrixZero(mat);
-	netF* vals = mat->vals;
-	int row;
-	for (row = 0; row < leftHeight; row++) {
-		int leftCol;
-		for (leftCol = 0; leftCol < leftWidth; leftCol++) {
-			int rightCol;
-			for (rightCol = 0; rightCol < rightWidth; rightCol++) {
-				mat->vals[leftCol * rightWidth + rightCol] +=
-					left->vals[row * leftWidth + leftCol] * right->vals[row * rightWidth + rightCol];
-			}
-		}
-	}
-	int col;
-	for (int col = 0; col < totalWidth; col++) {
-		mat->vals[col] /= leftHeight;
-	}
-	return mat;
-}
-
-
 static __inline netF dotProduct(netF* left, netF* right, const int count) {
 	netF sum = 0;
 	int idx = 0;
@@ -287,6 +270,100 @@ static __inline netF fastDotProduct(netF* left, netF* right, const int rounds, c
 	return sum;
 }
 
+static __inline void innerCLExpandMultiplyMatrices(const int leftHeight, const int rightHeight, const int leftWidth,
+	netF* leftVals, netF* rightVals, netF* matVals) {
+
+	int totalWidth = leftHeight * rightHeight;
+	size_t leftSize = sizeof(float) *  leftWidth * leftHeight;
+	size_t rightSize = sizeof(float) * leftWidth * rightHeight;
+	size_t matSize = sizeof(float) * totalWidth;
+
+	cl_int err;
+	err = clEnqueueWriteBuffer(globalClSettings.queue, globalClKernels.inputA, CL_TRUE, 0, leftSize, leftVals, 0, NULL, NULL);
+	err |= clEnqueueWriteBuffer(globalClSettings.queue, globalClKernels.inputB, CL_TRUE, 0, rightSize, rightVals, 0, NULL, NULL);
+
+	if (err) {
+		printf("Error %d When enqueuing the buffers.\n", err);
+	}
+
+	cl_kernel kernel = globalClKernels.expandMatrixMult->kernel;
+	err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &globalClKernels.inputA);
+	err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &globalClKernels.inputB);
+	err |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &globalClKernels.outputC);
+	err |= clSetKernelArg(kernel, 3, sizeof(int), &leftWidth);
+	err |= clSetKernelArg(kernel, 4, sizeof(int), &rightHeight);
+
+	if (err) {
+		printf("Error %d When setting the arguments.\n", err);
+	}
+
+	size_t globalSizes[] = {leftHeight, rightHeight};
+
+	// Execute the kernel over the entire range of the data set
+	err = clEnqueueNDRangeKernel(globalClSettings.queue, globalClKernels.expandMatrixMult->kernel, 2, NULL, globalSizes, NULL, 0, NULL, NULL);
+	if (err) {
+		printf("Error %d When executing the kernel.\n", err);
+	}
+
+	// Wait for the command queue to get serviced before reading back results
+	clFinish(globalClSettings.queue);
+
+	clEnqueueReadBuffer(globalClSettings.queue, globalClKernels.outputD, CL_TRUE, 0, matSize, matVals, 0, NULL, NULL);
+
+	int col;
+	for (int col = 0; col < totalWidth; col++) {
+		//printf("%d %f\n", col, matVals[col]);
+		matVals[col] /= leftHeight;
+	}
+}
+
+matrix* gpuExpandMultCollapseMatrices(matrix* left, matrix *right, matrix* result) {
+	int leftWidth = left->width;
+	int leftHeight = left->height;
+	int rightWidth = right->width;
+	int rightHeight = right->height;
+	if (leftWidth != rightWidth) {
+		return NULL;
+	}
+	int totalWidth = leftHeight * rightHeight;
+	matrix* mat = createOrUseSuppliedMatrix(result, 1, totalWidth);
+	innerCLExpandMultiplyMatrices(leftHeight, rightHeight, leftWidth,
+		left->vals, right->vals, mat->vals);
+
+	return mat;
+}
+
+matrix* expandMultCollapseMatrices(matrix* left, matrix *right, matrix* result) {
+	int leftWidth = left->width;
+	int leftHeight = left->height;
+	int rightWidth = right->width;
+	int rightHeight = right->height;
+	if (leftHeight != rightHeight) {
+		return NULL;
+	}
+	int totalWidth = leftWidth * rightWidth;
+	matrix* mat = createOrUseSuppliedMatrix(result, 1, totalWidth);
+	fillMatrixZero(mat);
+	netF* vals = mat->vals;
+	int row;
+	for (row = 0; row < leftHeight; row++) {
+		int leftCol;
+		for (leftCol = 0; leftCol < leftWidth; leftCol++) {
+			netF leftVal = left->vals[row * leftWidth + leftCol];
+			int rightCol;
+			for (rightCol = 0; rightCol < rightWidth; rightCol++) {
+				mat->vals[leftCol * rightWidth + rightCol] += leftVal * right->vals[row * rightWidth + rightCol];
+			}
+		}
+	}
+	int col;
+	for (int col = 0; col < totalWidth; col++) {
+		mat->vals[col] /= leftHeight;
+	}
+	return mat;
+}
+
+
 static __inline void innerTransMultiplyMatrices(const int leftHeight, const int leftWidth, const int rightHeight, netF* leftVals, netF* rightVals, netF* matVals) {
 	const int rounds = leftWidth >> 2;
 	const int rem = leftWidth & 0x3;
@@ -315,23 +392,22 @@ static __inline void innerCLTransMultiplyMatrices(const int leftHeight, const in
 	}
 
 	// Set the arguments to our compute kernel
-	err = clSetKernelArg(globalClKernels.transMatrixMult->kernel, 0, sizeof(cl_mem), &globalClKernels.inputA);
-	err |= clSetKernelArg(globalClKernels.transMatrixMult->kernel, 1, sizeof(cl_mem), &globalClKernels.inputB);
-	err |= clSetKernelArg(globalClKernels.transMatrixMult->kernel, 2, sizeof(cl_mem), &globalClKernels.outputC);
-	err |= clSetKernelArg(globalClKernels.transMatrixMult->kernel, 3, sizeof(int), &leftHeight);
-	err |= clSetKernelArg(globalClKernels.transMatrixMult->kernel, 4, sizeof(int), &leftWidth);
+	cl_kernel kernel = globalClKernels.transMatrixMult->kernel;
+	err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &globalClKernels.inputA);
+	err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &globalClKernels.inputB);
+	err |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &globalClKernels.outputC);
+	err |= clSetKernelArg(kernel, 3, sizeof(int), &leftHeight);
+	err |= clSetKernelArg(kernel, 4, sizeof(int), &leftWidth);
 	err |= clSetKernelArg(globalClKernels.transMatrixMult->kernel, 5, sizeof(int), &rightHeight);
 
 	if (err) {
 		printf("Error %d When setting the arguments.\n", err);
 	}
 
-
-	//size_t localSizes[] = {64, 64};
 	size_t globalSizes[] = { leftHeight, rightHeight};
 
 	// Execute the kernel over the entire range of the data set  
-	err = clEnqueueNDRangeKernel(globalClSettings.queue, globalClKernels.transMatrixMult->kernel, 1, NULL, globalSizes, NULL, 0, NULL, NULL);
+	err = clEnqueueNDRangeKernel(globalClSettings.queue, globalClKernels.transMatrixMult->kernel, 2, NULL, globalSizes, NULL, 0, NULL, NULL);
 	if (err) {
 		printf("Error %d When executing the kernel.\n", err);
 	}
@@ -415,6 +491,18 @@ matrix* addMatrices(matrix* left, matrix* right, matrix* result) {
 		for (col = 0; col < mat->width;col++) {
 			int idx = row * mat->width + col;
 			mat->vals[idx] = left->vals[idx] + right->vals[idx];
+		}
+	}
+	return mat;
+}
+
+matrix* transposeMatrix(matrix* original, matrix* result) {
+	matrix* mat = createOrUseSuppliedMatrix(result, original->width, original->height);
+	int row;
+	for (row = 0; row < original->height; row++) {
+		int col;
+		for (col = 0; col < original->width; col++) {
+			mat->vals[col * original->height + row] = original->vals[row * original->width + col];
 		}
 	}
 	return mat;

@@ -1,7 +1,7 @@
 #ifndef _CL_UTILS_H
 #define _CL_UTILS_H
 
-#include <CL/opencl.h>
+#include <OpenCL/opencl.h>
 
 struct clSettingsStub;
 typedef struct clSettingsStub {
@@ -23,9 +23,11 @@ typedef struct clStandAloneKernelStub {
 struct clKernelsStub;
 typedef struct clKernelsStub {
 	clStandAloneKernel* transMatrixMult;
+	clStandAloneKernel* expandMatrixMult;
 	cl_mem inputA;
 	cl_mem inputB;
 	cl_mem outputC;
+	cl_mem outputD;
 } clKernels;
 
 

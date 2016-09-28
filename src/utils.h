@@ -2,6 +2,7 @@
 #define UTILS_H_
 
 #include <stdio.h>
+#include <time.h>
 #include "coreDefs.h"
 
 struct stringFragmentStub;
@@ -19,6 +20,11 @@ typedef struct intResultStub {
 #define PRINT_FLUSH(guard, format, ...) \
 	if (guard) { printf(format, ## __VA_ARGS__); fflush(stdout); }
 
+#define pauseLike() \
+    PRINT_FLUSH(1, "Press enter to continue.\n"); \
+    int _ch = 0; while (_ch == 0) _ch = getchar(); 
+
+
 void seedRand();
 netF randomNetF();
 netF randomZeroCenteredNetF();
@@ -35,5 +41,7 @@ netF parseNetF(stringFragment* frag);
 netF parseNetFFromCString(char* string);
 
 int parseCommaSeperatedInts(char* string, int* values, int maxValues);
+
+double clocksToSeconds(clock_t start, clock_t end);
 
 #endif

@@ -1,4 +1,9 @@
+#ifdef __APPLE__
+#include <OpenCL/opencl.h>
+#else
 #include <CL/opencl.h>
+#endif
+
 #include <math.h>
 #include <stdlib.h>
 #include "utils.h"
@@ -12,7 +17,7 @@ clKernels globalClKernels;
 
 
 
-const char *addKernelSrc =
+static const char *addKernelSrc =
 "__kernel void vecAdd(  __global float *a,                       \n" \
 "                       __global float *b,                       \n" \
 "                       __global float *c,                       \n" \
@@ -28,7 +33,7 @@ const char *addKernelSrc =
 "\n";
 
 
-const char* transMatrixMultSrc =
+static const char* transMatrixMultSrc =
 "__kernel void transMatrixMult(__global const float *left, __global const float *right, __global float *target, const int leftHeight, const int leftWidth, const int rightHeight) { \n"
 "  int row = get_global_id(0);\n"
 "  int col = get_global_id(1);\n"
@@ -41,6 +46,19 @@ const char* transMatrixMultSrc =
 "    sum += left[row * leftWidth + n] * right[leftWidth * col + n];\n"
 "  }\n"
 "  target[row * rightHeight + col] = sum;\n"
+"}";
+
+static const char* expandMatrixMultSrc = "__kernel void expandMatrixMult(__global const float *left, __global const float *right, __global float *target,\n"
+"  const int leftWidth, const int rightHeight) { \n"
+"  int leftRow = get_global_id(0);\n"
+"  int rightRow = get_global_id(1);\n"
+"\n"
+"  float sum = 0;\n"
+"  int n;\n"
+"  for(n = 0; n < leftWidth; n++) {\n"
+"    sum += left[leftRow * leftWidth + n] * right[rightRow * leftWidth + n];\n"
+"  }\n"
+"  target[leftRow * rightHeight + rightRow] = sum;\n"
 "}";
 
 /*const char* transMatrixMultSrc =
@@ -115,7 +133,7 @@ int clCoreInit() {
 	for (n = 0; n < count; n++) {
 		size_t paramSize;
 		err = clGetDeviceInfo(deviceIds[n], CL_DEVICE_EXTENSIONS, 1024, paramBuffer, &paramSize);
-		//PRINT_FLUSH(CL_UTILS_INCLUDE_DEBUGS, "Device %d Extensions: %.*s\n", n, paramSize, paramBuffer);
+		//PRINT_FLUSH(CL_UTILS_INCLUDE_DEBUGS, "Device %d Extensions: %.*s\n", n, (int)paramSize, paramBuffer);
 		//the device with the most extensions is likely to be the best
 		if (paramSize > longest) {
 			longest = paramSize;
@@ -134,7 +152,11 @@ int clCoreInit() {
 		return 1;
 	}
 
+	#ifdef __APPLE__
+	cl_command_queue queue = clCreateCommandQueue(context, chosenDevice, 0, &err);
+	#else
 	cl_command_queue queue = clCreateCommandQueueWithProperties(context, chosenDevice, 0, &err);
+	#endif
 	if (err) {
 		printf("Error %d occured when creating a command queue.\n", err);
 		clReleaseContext(context);
@@ -170,13 +192,15 @@ int clInit() {
 		return result;
 	}
 	clStandAloneKernel* transMatrixMult = createStandAloneKernel(transMatrixMultSrc, "transMatrixMult");
+	clStandAloneKernel* expandMatrixMult = createStandAloneKernel(expandMatrixMultSrc, "expandMatrixMult");
 	if (transMatrixMult == NULL) {
 		clCoreEnd();
 		return 1;
 	}
 	globalClKernels.transMatrixMult = transMatrixMult;
+	globalClKernels.expandMatrixMult = expandMatrixMult;
 
-	size_t maxSize = sizeof(float) * 1000 * 1000;
+	size_t maxSize = sizeof(float) * 4000 * 4000;
 	globalClKernels.inputA = clCreateBuffer(globalClSettings.context, CL_MEM_READ_ONLY, maxSize, NULL, NULL);
 	globalClKernels.inputB = clCreateBuffer(globalClSettings.context, CL_MEM_READ_ONLY, maxSize, NULL, NULL);
 	globalClKernels.outputC = clCreateBuffer(globalClSettings.context, CL_MEM_WRITE_ONLY, maxSize, NULL, NULL);
@@ -188,6 +212,7 @@ void clEnd() {
 	clReleaseMemObject(globalClKernels.inputB);
 	clReleaseMemObject(globalClKernels.outputC);
 	deleteStandAloneKernel(globalClKernels.transMatrixMult);
+	deleteStandAloneKernel(globalClKernels.expandMatrixMult);
 	clCoreEnd();
 }
 
@@ -207,6 +232,10 @@ clStandAloneKernel* createStandAloneKernel(const char* src, const char* name) {
 			clGetProgramBuildInfo(program, globalClSettings.device, CL_PROGRAM_BUILD_LOG, 0, NULL, &log_size);
 			char *log = (char *)malloc(log_size);
 			clGetProgramBuildInfo(program, globalClSettings.device, CL_PROGRAM_BUILD_LOG, log_size, log, NULL);
+
+					PRINT_FLUSH(CL_UTILS_INCLUDE_DEBUGS,  "%.*s\n", 	(int)log_size, log);
+
+
 			free(log);
 			
 		}

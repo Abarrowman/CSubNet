@@ -209,3 +209,7 @@ int parseCommaSeperatedInts(char* string, int* values, int maxValues) {
 	}
 	return valueIdx;
 }
+
+double clocksToSeconds(clock_t start, clock_t end) {
+	return ((double)(end - start)) / CLOCKS_PER_SEC;
+}
