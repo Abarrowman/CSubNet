@@ -270,7 +270,7 @@ static __inline netF fastDotProduct(netF* left, netF* right, const int rounds, c
 	return sum;
 }
 
-static __inline void innerCLExpandMultiplyMatrices(const int leftHeight, const int rightHeight, const int leftWidth,
+static __inline void innerCLTransExpandMultiplyMatrices(const int leftHeight, const int rightHeight, const int leftWidth,
 	netF* leftVals, netF* rightVals, netF* matVals) {
 
 	int totalWidth = leftHeight * rightHeight;
@@ -286,7 +286,7 @@ static __inline void innerCLExpandMultiplyMatrices(const int leftHeight, const i
 		printf("Error %d When enqueuing the buffers.\n", err);
 	}
 
-	cl_kernel kernel = globalClKernels.expandMatrixMult->kernel;
+	cl_kernel kernel = globalClKernels.transExpandMatrixMult->kernel;
 	err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &globalClKernels.inputA);
 	err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &globalClKernels.inputB);
 	err |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &globalClKernels.outputC);
@@ -300,7 +300,7 @@ static __inline void innerCLExpandMultiplyMatrices(const int leftHeight, const i
 	size_t globalSizes[] = {leftHeight, rightHeight};
 
 	// Execute the kernel over the entire range of the data set
-	err = clEnqueueNDRangeKernel(globalClSettings.queue, globalClKernels.expandMatrixMult->kernel, 2, NULL, globalSizes, NULL, 0, NULL, NULL);
+	err = clEnqueueNDRangeKernel(globalClSettings.queue, kernel, 2, NULL, globalSizes, NULL, 0, NULL, NULL);
 	if (err) {
 		printf("Error %d When executing the kernel.\n", err);
 	}
@@ -317,7 +317,7 @@ static __inline void innerCLExpandMultiplyMatrices(const int leftHeight, const i
 	}
 }
 
-matrix* gpuExpandMultCollapseMatrices(matrix* left, matrix *right, matrix* result) {
+matrix* gpuTransExpandMultCollapseMatrices(matrix* left, matrix *right, matrix* result) {
 	int leftWidth = left->width;
 	int leftHeight = left->height;
 	int rightWidth = right->width;
@@ -327,7 +327,7 @@ matrix* gpuExpandMultCollapseMatrices(matrix* left, matrix *right, matrix* resul
 	}
 	int totalWidth = leftHeight * rightHeight;
 	matrix* mat = createOrUseSuppliedMatrix(result, 1, totalWidth);
-	innerCLExpandMultiplyMatrices(leftHeight, rightHeight, leftWidth,
+	innerCLTransExpandMultiplyMatrices(leftHeight, rightHeight, leftWidth,
 		left->vals, right->vals, mat->vals);
 
 	return mat;
@@ -398,7 +398,7 @@ static __inline void innerCLTransMultiplyMatrices(const int leftHeight, const in
 	err |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &globalClKernels.outputC);
 	err |= clSetKernelArg(kernel, 3, sizeof(int), &leftHeight);
 	err |= clSetKernelArg(kernel, 4, sizeof(int), &leftWidth);
-	err |= clSetKernelArg(globalClKernels.transMatrixMult->kernel, 5, sizeof(int), &rightHeight);
+	err |= clSetKernelArg(kernel, 5, sizeof(int), &rightHeight);
 
 	if (err) {
 		printf("Error %d When setting the arguments.\n", err);
@@ -407,7 +407,7 @@ static __inline void innerCLTransMultiplyMatrices(const int leftHeight, const in
 	size_t globalSizes[] = { leftHeight, rightHeight};
 
 	// Execute the kernel over the entire range of the data set  
-	err = clEnqueueNDRangeKernel(globalClSettings.queue, globalClKernels.transMatrixMult->kernel, 2, NULL, globalSizes, NULL, 0, NULL, NULL);
+	err = clEnqueueNDRangeKernel(globalClSettings.queue, kernel, 2, NULL, globalSizes, NULL, 0, NULL, NULL);
 	if (err) {
 		printf("Error %d When executing the kernel.\n", err);
 	}

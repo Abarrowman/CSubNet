@@ -48,7 +48,7 @@ static const char* transMatrixMultSrc =
 "  target[row * rightHeight + col] = sum;\n"
 "}";
 
-static const char* expandMatrixMultSrc = "__kernel void expandMatrixMult(__global const float *left, __global const float *right, __global float *target,\n"
+static const char* transExpandMatrixMultSrc = "__kernel void transExpandMatrixMult(__global const float *left, __global const float *right, __global float *target,\n"
 "  const int leftWidth, const int rightHeight) { \n"
 "  int leftRow = get_global_id(0);\n"
 "  int rightRow = get_global_id(1);\n"
@@ -192,13 +192,13 @@ int clInit() {
 		return result;
 	}
 	clStandAloneKernel* transMatrixMult = createStandAloneKernel(transMatrixMultSrc, "transMatrixMult");
-	clStandAloneKernel* expandMatrixMult = createStandAloneKernel(expandMatrixMultSrc, "expandMatrixMult");
+	clStandAloneKernel* transExpandMatrixMult = createStandAloneKernel(transExpandMatrixMultSrc, "transExpandMatrixMult");
 	if (transMatrixMult == NULL) {
 		clCoreEnd();
 		return 1;
 	}
 	globalClKernels.transMatrixMult = transMatrixMult;
-	globalClKernels.expandMatrixMult = expandMatrixMult;
+	globalClKernels.transExpandMatrixMult = transExpandMatrixMult;
 
 	size_t maxSize = sizeof(float) * 4000 * 4000;
 	globalClKernels.inputA = clCreateBuffer(globalClSettings.context, CL_MEM_READ_ONLY, maxSize, NULL, NULL);
@@ -212,7 +212,7 @@ void clEnd() {
 	clReleaseMemObject(globalClKernels.inputB);
 	clReleaseMemObject(globalClKernels.outputC);
 	deleteStandAloneKernel(globalClKernels.transMatrixMult);
-	deleteStandAloneKernel(globalClKernels.expandMatrixMult);
+	deleteStandAloneKernel(globalClKernels.transExpandMatrixMult);
 	clCoreEnd();
 }
 

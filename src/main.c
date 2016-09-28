@@ -407,7 +407,7 @@ int testCandidate(int candidate) {
 		for (n = 0; n < loops; n++) {
 			transposeMatrix(a, at);
 			transposeMatrix(b, bt);
-			gpuExpandMultCollapseMatrices(at, bt, c);
+			gpuTransExpandMultCollapseMatrices(at, bt, c);
 		}
 	} else if (candidate == 2) {
 		for (n = 0; n < loops; n++) {

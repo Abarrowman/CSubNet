@@ -23,7 +23,7 @@ typedef struct clStandAloneKernelStub {
 struct clKernelsStub;
 typedef struct clKernelsStub {
 	clStandAloneKernel* transMatrixMult;
-	clStandAloneKernel* expandMatrixMult;
+	clStandAloneKernel* transExpandMatrixMult;
 	cl_mem inputA;
 	cl_mem inputB;
 	cl_mem outputC;

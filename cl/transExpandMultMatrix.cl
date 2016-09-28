@@ -1,4 +1,4 @@
-__kernel void expandMatrixMult(__global const float *left, __global const float *right, __global float *target,
+__kernel void transExpandMatrixMult(__global const float *left, __global const float *right, __global float *target,
   const int leftWidth, const int rightHeight) { 
   int leftRow = get_global_id(0);
   int rightRow = get_global_id(1);
