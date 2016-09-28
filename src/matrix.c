@@ -496,16 +496,29 @@ matrix* addMatrices(matrix* left, matrix* right, matrix* result) {
 	return mat;
 }
 
-matrix* transposeMatrix(matrix* original, matrix* result) {
-	matrix* mat = createOrUseSuppliedMatrix(result, original->width, original->height);
+static __inline void innerTransposeMatrix(netF* original, netF* result, int originalHigh, int originalWide) {
 	int row;
-	for (row = 0; row < original->height; row++) {
+	for (row = 0; row < originalHigh; row++) {
 		int col;
-		for (col = 0; col < original->width; col++) {
-			mat->vals[col * original->height + row] = original->vals[row * original->width + col];
+		for (col = 0; col < originalWide; col++) {
+			result[col * originalHigh + row] = original[row * originalWide + col];
 		}
 	}
+}
+
+matrix* transposeMatrix(matrix* original, matrix* result) {
+	matrix* mat = createOrUseSuppliedMatrix(result, original->width, original->height);
+	innerTransposeMatrix(original->vals, result->vals, original->height, original->width);
 	return mat;
+}
+
+matrix* transposeMatrixSelf(matrix* original, netF* extraData) {
+	innerTransposeMatrix(original->vals, extraData, original->height, original->width);
+	setMatrixValues(original, extraData);
+	int oldHeight = original->height;
+	original->height = original->width;
+	original->width = oldHeight;
+	return original;
 }
 
 netF sumSquareMatrix(matrix* mat) {

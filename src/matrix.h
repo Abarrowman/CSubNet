@@ -47,6 +47,7 @@ matrix* gpuTransExpandMultCollapseMatrices(matrix* left, matrix *right, matrix* 
 
 
 matrix* transposeMatrix(matrix* original, matrix* result);
+matrix* transposeMatrixSelf(matrix* original, netF* extraData);
 
 
 
