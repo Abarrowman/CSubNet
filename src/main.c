@@ -386,6 +386,7 @@ int execute(int paramCount, char** params) {
 }
 
 int testCandidate(int candidate) {
+	int mode = 1;
 	int loops = 100;
 	int leftHeight = 1000;
 	int rightWidth = 1000;
@@ -400,30 +401,55 @@ int testCandidate(int candidate) {
 	matrix* at = createMatrix(leftWidth, leftHeight);
 	matrix* bt = createMatrix(rightWidth, leftHeight);
 
-	matrix* c = createMatrix(1, leftWidth * rightWidth);
+	matrix* c = NULL;
+	matrix* d = NULL;
+	if (mode == 1) {
+		c = createMatrix(1, leftWidth * rightWidth);
+		d = createMatrix(1, leftWidth * rightWidth);
+	} else if (mode == 2) {
+		c = createMatrix(leftHeight, leftHeight);
+		d = createMatrix(leftHeight, leftHeight);
+	}
+	
 
+	clock_t start = clock();
 	int n;
-	if (candidate == 1) {
-		for (n = 0; n < loops; n++) {
+	for (n = 0; n < loops; n++) {
+		if (mode == 1) {
 			transposeMatrix(a, at);
 			transposeMatrix(b, bt);
 			gpuTransExpandMultCollapseMatrices(at, bt, c);
-		}
-	} else if (candidate == 2) {
-		for (n = 0; n < loops; n++) {
-			expandMultCollapseMatrices(a, b, c);
+		} else if (mode == 2) {
+			gpuTransMultiplyMatrices(a, b, c);
 		}
 	}
+	clock_t end = clock();
+	PRINT_FLUSH(1, "GPU %lfs\n", clocksToSeconds(start, end));
+	start = clock();
+	for (n = 0; n < loops; n++) {
+		if (mode == 1) {
+			expandMultCollapseMatrices(a, b, d);
+		} else if (mode == 2) {
+			cpuTransMultiplyMatrices(a, b, d);
+		}
+	}
+	end = clock();
+	PRINT_FLUSH(1, "CPU %lfs\n", clocksToSeconds(start, end));
+	PRINT_FLUSH(1, "Error: %f\n", sumSquareMatrix(subtractMatrices(c, d, d)));
+
 
 	deleteMatrix(a);
 	deleteMatrix(b);
+	deleteMatrix(at);
+	deleteMatrix(bt);
 	deleteMatrix(c);
-	//deleteMatrix(d);
-
+	deleteMatrix(d);
+	pauseLike();
 	return 0;
 }
 
 //-t -l=1 -a=swarm "E:\A\Dropbox\Dev\Multiple\SubNet\test\test-experiment\rated.csv" 19 "E:\A\Dropbox\Dev\Multiple\SubNet\test\test-experiment\network.net"
+// "-t" "-r=30000" "-l=2" "-s=44,2,1" "-a=backprop" "E:\A\Dropbox\Dev\Multiple\SubNet\test\mal\rated-list.csv" "44" "E:\A\Dropbox\Dev\Multiple\SubNet\test\mal\network-few-hidden.net"
 int main(int argc, char *argv[]) {
 	clock_t start = clock();
 	int n;
@@ -445,10 +471,8 @@ int main(int argc, char *argv[]) {
 			result = reTrain(argc - 2, &argv[2]);
 		} else if (strcmp(command, "-e") == 0) {
 			result = execute(argc - 2, &argv[2]);
-		/*} else if (strcmp(command, "-c1") == 0) {
-			return 	testCandidate(1);
-		} else if (strcmp(command, "-c2") == 0) {
-			return testCandidate(2);*/
+		//} else if (strcmp(command, "-c") == 0) {
+		//	return 	testCandidate(1);
 		} else {
 			help();
 			if (strcmp(command, "-h") == 0) {
@@ -460,5 +484,6 @@ int main(int argc, char *argv[]) {
 	clEnd();
 	clock_t end = clock();
 	PRINT_FLUSH(1, "Duration %lfs\n", clocksToSeconds(start, end));
+	//pauseLike();
 	return result;
 }

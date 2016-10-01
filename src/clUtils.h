@@ -1,7 +1,11 @@
 #ifndef _CL_UTILS_H
 #define _CL_UTILS_H
 
+#ifdef __APPLE__
 #include <OpenCL/opencl.h>
+#else
+#include <CL/opencl.h>
+#endif
 
 struct clSettingsStub;
 typedef struct clSettingsStub {
@@ -27,7 +31,6 @@ typedef struct clKernelsStub {
 	cl_mem inputA;
 	cl_mem inputB;
 	cl_mem outputC;
-	cl_mem outputD;
 } clKernels;
 
 

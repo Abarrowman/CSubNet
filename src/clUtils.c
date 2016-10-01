@@ -32,61 +32,36 @@ static const char *addKernelSrc =
 "}                                                               \n" \
 "\n";
 
-
-static const char* transMatrixMultSrc =
-"__kernel void transMatrixMult(__global const float *left, __global const float *right, __global float *target, const int leftHeight, const int leftWidth, const int rightHeight) { \n"
+static const char* transMatrixMultSrc = "__kernel void transMatrixMult(__global const float *left, __global const float *right, __global float *target,\n"
+" const int leftHeight, const int leftWidth, const int rightHeight) { \n"
 "  int row = get_global_id(0);\n"
-"  int col = get_global_id(1);\n"
 "\n"
-"  __global float* a = left + row * leftWidth;\n"
-"  __global float* b = right + leftWidth * col;\n"
-"  float sum = 0;\n"
-"  int n;\n"
-"  for(n = 0; n < leftWidth; n++) {\n"
-"    sum += left[row * leftWidth + n] * right[leftWidth * col + n];\n"
+"  int col;\n"
+"  for (col = 0; col < rightHeight; col++) {\n"
+"    float sum = 0;\n"
+"    int n;\n"
+"    for (n = 0; n < leftWidth; n++) {\n"
+"\t  sum += left[row * leftWidth + n] * right[leftWidth * col + n];\n"
+"    }\n"
+"    target[row * rightHeight + col] = sum;\n"
 "  }\n"
-"  target[row * rightHeight + col] = sum;\n"
 "}";
 
-static const char* transExpandMatrixMultSrc = "__kernel void transExpandMatrixMult(__global const float *left, __global const float *right, __global float *target,\n"
+static const char* transExpandMatrixMultSrc =
+"__kernel void transExpandMatrixMult(__global const float *left, __global const float *right, __global float *target,\n"
 "  const int leftWidth, const int rightHeight) { \n"
 "  int leftRow = get_global_id(0);\n"
-"  int rightRow = get_global_id(1);\n"
-"\n"
-"  float sum = 0;\n"
-"  int n;\n"
-"  for(n = 0; n < leftWidth; n++) {\n"
-"    sum += left[leftRow * leftWidth + n] * right[rightRow * leftWidth + n];\n"
-"  }\n"
-"  target[leftRow * rightHeight + rightRow] = sum;\n"
-"}";
-
-/*const char* transMatrixMultSrc =
-"__kernel void transMatrixMult(__global const float *left, __global const float *right, __global float *target, const int leftHeight, const int leftWidth, const int rightHeight) { \n"
-"  int id = get_global_id(0);\n"
-"  if (id < (leftHeight * rightHeight)) {\n"
-"    int row = id / rightHeight;\n"
-"    int col = id % rightHeight;\n"
-"    __global float* a = left + row * leftWidth;\n"
-"    __global float* b = right + leftWidth * col;\n"
+"  \n"
+"  int rightRow;\n"
+"  for (rightRow = 0; rightRow < rightHeight; rightRow++) {\n"
 "    float sum = 0;\n"
 "    int n;\n"
 "    for(n = 0; n < leftWidth; n++) {\n"
-"      sum += a[n] * b[n];\n"
+"      sum += left[leftRow * leftWidth + n] * right[rightRow * leftWidth + n];\n"
 "    }\n"
-"    target[id] = sum;\n"
+"    target[leftRow * rightHeight + rightRow] = sum;\n"
 "  }\n"
-"}\n"
-"\n";*/
-
-/*const char* transMatrixMultSrc =
-"__kernel void transMatrixMult(__global const float *left, __global const float *right, __global float *target, const int leftHeight, const int leftWidth, const int rightHeight) { \n"
-"  int id = get_global_id(0);\n"
-"  if (id < (leftHeight * rightHeight)) {\n"
-"    target[id] = 5.0;\n"
-"  }"
-"}\n"
-"\n";*/
+"}";
 
 int clCoreInit() {
 	if (globalClSettings.initialized) {
@@ -126,23 +101,36 @@ int clCoreInit() {
 		PRINT_FLUSH(CL_UTILS_INCLUDE_DEBUGS, "There are more than 8 OpenCL devices, only the first 8 will be considered.\n");
 	}
 
-	char paramBuffer[1024];
-	size_t longest = -1;
-	int bestIdx = 0;
-	int n;
+	
+	int bestIdx = count - 1;
+	unsigned int n;
 	for (n = 0; n < count; n++) {
-		size_t paramSize;
-		err = clGetDeviceInfo(deviceIds[n], CL_DEVICE_EXTENSIONS, 1024, paramBuffer, &paramSize);
-		//PRINT_FLUSH(CL_UTILS_INCLUDE_DEBUGS, "Device %d Extensions: %.*s\n", n, (int)paramSize, paramBuffer);
-		//the device with the most extensions is likely to be the best
-		if (paramSize > longest) {
-			longest = paramSize;
-			bestIdx = n;
-		}
+		char nameBuffer[256];
+		size_t nameLength;
+		char versionBuffer[256];
+		size_t versionLength;
+		cl_uint computeUnits;
+		cl_uint clockFrequency;
+		cl_ulong globalMemory;
+		cl_ulong localMemory;
+		err = clGetDeviceInfo(deviceIds[n], CL_DEVICE_NAME, sizeof(nameBuffer), nameBuffer, &nameLength);
+		err |= clGetDeviceInfo(deviceIds[n], CL_DEVICE_VERSION, sizeof(versionBuffer), versionBuffer, &versionLength);
+		err |= clGetDeviceInfo(deviceIds[n], CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(computeUnits), &computeUnits, NULL);
+		err |= clGetDeviceInfo(deviceIds[n], CL_DEVICE_MAX_CLOCK_FREQUENCY, sizeof(clockFrequency), &clockFrequency, NULL);
+		err |= clGetDeviceInfo(deviceIds[n], CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(globalMemory), &globalMemory, NULL);
+		err |= clGetDeviceInfo(deviceIds[n], CL_DEVICE_LOCAL_MEM_SIZE, sizeof(localMemory), &localMemory, NULL);
+
 		if (err) {
-			PRINT_FLUSH(CL_UTILS_INCLUDE_DEBUGS, "Error %d occured while getting device info.\n", err);
+			PRINT_FLUSH(CL_UTILS_INCLUDE_DEBUGS, "Error %u occured while getting device info.\n", err);
 			return 1;
 		}
+
+		PRINT_FLUSH(CL_UTILS_INCLUDE_DEBUGS, "Device %u %.*s\n", n, (int)nameLength, nameBuffer);
+		PRINT_FLUSH(CL_UTILS_INCLUDE_DEBUGS, "%.*s\n", (int)versionLength, versionBuffer);
+		PRINT_FLUSH(CL_UTILS_INCLUDE_DEBUGS, "Max Compute Units: %u\n", computeUnits);
+		PRINT_FLUSH(CL_UTILS_INCLUDE_DEBUGS, "Max Clock Frequency: %u MHz\n", clockFrequency); 
+		PRINT_FLUSH(CL_UTILS_INCLUDE_DEBUGS, "Max Global Memory: %llu bytes\n", globalMemory);
+		PRINT_FLUSH(CL_UTILS_INCLUDE_DEBUGS, "Max Local Memory: %llu bytes\n", globalMemory);
 	}
 	//for now use only the best device
 	cl_device_id chosenDevice = deviceIds[bestIdx];
@@ -193,7 +181,7 @@ int clInit() {
 	}
 	clStandAloneKernel* transMatrixMult = createStandAloneKernel(transMatrixMultSrc, "transMatrixMult");
 	clStandAloneKernel* transExpandMatrixMult = createStandAloneKernel(transExpandMatrixMultSrc, "transExpandMatrixMult");
-	if (transMatrixMult == NULL) {
+	if ((transMatrixMult == NULL) || (transExpandMatrixMult == NULL)) {
 		clCoreEnd();
 		return 1;
 	}

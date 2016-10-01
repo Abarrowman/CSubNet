@@ -297,10 +297,10 @@ static __inline void innerCLTransExpandMultiplyMatrices(const int leftHeight, co
 		printf("Error %d When setting the arguments.\n", err);
 	}
 
-	size_t globalSizes[] = {leftHeight, rightHeight};
+	size_t globalSizes[] = {leftHeight};
 
 	// Execute the kernel over the entire range of the data set
-	err = clEnqueueNDRangeKernel(globalClSettings.queue, kernel, 2, NULL, globalSizes, NULL, 0, NULL, NULL);
+	err = clEnqueueNDRangeKernel(globalClSettings.queue, kernel, 1, NULL, globalSizes, NULL, 0, NULL, NULL);
 	if (err) {
 		printf("Error %d When executing the kernel.\n", err);
 	}
@@ -308,12 +308,11 @@ static __inline void innerCLTransExpandMultiplyMatrices(const int leftHeight, co
 	// Wait for the command queue to get serviced before reading back results
 	clFinish(globalClSettings.queue);
 
-	clEnqueueReadBuffer(globalClSettings.queue, globalClKernels.outputD, CL_TRUE, 0, matSize, matVals, 0, NULL, NULL);
+	clEnqueueReadBuffer(globalClSettings.queue, globalClKernels.outputC, CL_TRUE, 0, matSize, matVals, 0, NULL, NULL);
 
 	int col;
-	for (int col = 0; col < totalWidth; col++) {
-		//printf("%d %f\n", col, matVals[col]);
-		matVals[col] /= leftHeight;
+	for (col = 0; col < totalWidth; col++) {
+		matVals[col] /= leftWidth;
 	}
 }
 
@@ -357,7 +356,7 @@ matrix* expandMultCollapseMatrices(matrix* left, matrix *right, matrix* result) 
 		}
 	}
 	int col;
-	for (int col = 0; col < totalWidth; col++) {
+	for (col = 0; col < totalWidth; col++) {
 		mat->vals[col] /= leftHeight;
 	}
 	return mat;
@@ -404,10 +403,11 @@ static __inline void innerCLTransMultiplyMatrices(const int leftHeight, const in
 		printf("Error %d When setting the arguments.\n", err);
 	}
 
-	size_t globalSizes[] = { leftHeight, rightHeight};
+	size_t globalSizes[] = { leftHeight };
+
 
 	// Execute the kernel over the entire range of the data set  
-	err = clEnqueueNDRangeKernel(globalClSettings.queue, kernel, 2, NULL, globalSizes, NULL, 0, NULL, NULL);
+	err = clEnqueueNDRangeKernel(globalClSettings.queue, kernel, 1, NULL, globalSizes, NULL, 0, NULL, NULL);
 	if (err) {
 		printf("Error %d When executing the kernel.\n", err);
 	}
