@@ -32,16 +32,25 @@ static const char *addKernelSrc =
 "}                                                               \n" \
 "\n";
 
-static const char* transMatrixMultSrc = "__kernel void transMatrixMult(__global const float *left, __global const float *right, __global float *target,\n"
-" const int leftHeight, const int leftWidth, const int rightHeight) { \n"
+static const char* transMatrixMultSrc = 
+"__kernel __attribute__((vec_type_hint(float4))) void transMatrixMult(\n"
+"    __global const float *left, __global const float *right, __global float *target,\n"
+"    const int leftHeight, const int leftWidth, const int rightHeight) { \n"
 "  int row = get_global_id(0);\n"
-"\n"
+"  int vectorEnd = leftWidth - leftWidth % 4 - 3;\n"
 "  int col;\n"
 "  for (col = 0; col < rightHeight; col++) {\n"
 "    float sum = 0;\n"
 "    int n;\n"
-"    for (n = 0; n < leftWidth; n++) {\n"
-"\t  sum += left[row * leftWidth + n] * right[leftWidth * col + n];\n"
+"\t__global const float* l = left + row * leftWidth;\n"
+"\t__global const float* r = right + leftWidth * col;\n"
+"\tfor (n = 0; n <= vectorEnd; n += 4) {\n"
+"\t  float4 lv = vload4(n, l);\n"
+"\t  float4 rv = vload4(n, r);\n"
+"\t  sum += dot(lv, rv);\n"
+"\t}\n"
+"\tfor (n = n; n < leftWidth; n++) {\n"
+"\t  sum += l[n] * r[n];\n"
 "    }\n"
 "    target[row * rightHeight + col] = sum;\n"
 "  }\n"
@@ -132,7 +141,9 @@ int clCoreInit() {
 		PRINT_FLUSH(CL_UTILS_INCLUDE_DEBUGS, "Max Global Memory: %llu bytes\n", globalMemory);
 		PRINT_FLUSH(CL_UTILS_INCLUDE_DEBUGS, "Max Local Memory: %llu bytes\n", globalMemory);
 	}
+
 	//for now use only the best device
+	PRINT_FLUSH(CL_UTILS_INCLUDE_DEBUGS, "Using Device %d\n", bestIdx);
 	cl_device_id chosenDevice = deviceIds[bestIdx];
 	cl_context context = clCreateContext(NULL, 1, &chosenDevice, NULL, NULL, &err);
 	if (err) {

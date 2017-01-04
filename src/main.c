@@ -450,6 +450,7 @@ int testCandidate(int candidate) {
 
 //-t -l=1 -a=swarm "E:\A\Dropbox\Dev\Multiple\SubNet\test\test-experiment\rated.csv" 19 "E:\A\Dropbox\Dev\Multiple\SubNet\test\test-experiment\network.net"
 // "-t" "-r=30000" "-l=2" "-s=44,2,1" "-a=backprop" "E:\A\Dropbox\Dev\Multiple\SubNet\test\mal\rated-list.csv" "44" "E:\A\Dropbox\Dev\Multiple\SubNet\test\mal\network-few-hidden.net"
+// "-t" "-r=30000" "-l=2" "-s=44,2,1" "-a=backprop" "E:\A\Dropbox\Dev\Multiple\SubNet\test\mal\rated-list.csv" "44" "E:\A\Dropbox\Dev\Multiple\SubNet\test\mal\network-few-hidden.net"
 int main(int argc, char *argv[]) {
 	clock_t start = clock();
 	int n;
@@ -471,8 +472,8 @@ int main(int argc, char *argv[]) {
 			result = reTrain(argc - 2, &argv[2]);
 		} else if (strcmp(command, "-e") == 0) {
 			result = execute(argc - 2, &argv[2]);
-		//} else if (strcmp(command, "-c") == 0) {
-		//	return 	testCandidate(1);
+		} else if (strcmp(command, "-c") == 0) {
+			return 	testCandidate(1);
 		} else {
 			help();
 			if (strcmp(command, "-h") == 0) {

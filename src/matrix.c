@@ -432,17 +432,7 @@ matrix* mat = createOrUseSuppliedMatrix(result, leftHeight, rightHeight); \
 
 matrix* transMultiplyMatrices(matrix* left, matrix* right, matrix* result) {
 	OUTER_TRANS_MULT_MATRIX(left, right, result)
-
-	int memory = leftHeight * leftWidth + rightHeight * leftWidth + leftHeight * rightHeight;
 	int useCpu = 1;
-	if (memory > 10000) {
-		int computations = leftHeight * rightHeight * leftWidth;
-		float cpuPerformance = computations / 60000000.0f;
-		float gpuPerformance = 0.0085f + memory / 13000000.0f;
-		if (gpuPerformance < cpuPerformance) {
-			useCpu = 0;
-		}
-	}
 	if (useCpu) {
 		innerTransMultiplyMatrices(leftHeight, leftWidth, rightHeight, left->vals, right->vals, mat->vals);
 	} else {
