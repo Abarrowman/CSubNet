@@ -9,7 +9,6 @@
 #include "trainingData.h"
 #include "utils.h"
 #include "csv.h"
-#include "clUtils.h"
 
 #define MAX_NETWORK_SIZES (10)
 
@@ -387,7 +386,7 @@ int execute(int paramCount, char** params) {
 
 int testCandidate(int candidate) {
 	int mode = 1;
-	int loops = 100;
+	int loops = 10;
 	int leftHeight = 1000;
 	int rightWidth = 1000;
 	int leftWidth = 1000;
@@ -398,34 +397,15 @@ int testCandidate(int candidate) {
 	matrix* b = createMatrix(leftHeight, rightWidth);
 	fillMatrixRandom(b);
 
-	matrix* at = createMatrix(leftWidth, leftHeight);
-	matrix* bt = createMatrix(rightWidth, leftHeight);
-
-	matrix* c = NULL;
 	matrix* d = NULL;
 	if (mode == 1) {
-		c = createMatrix(1, leftWidth * rightWidth);
 		d = createMatrix(1, leftWidth * rightWidth);
 	} else if (mode == 2) {
-		c = createMatrix(leftHeight, leftHeight);
 		d = createMatrix(leftHeight, leftHeight);
 	}
 	
-
 	clock_t start = clock();
 	int n;
-	for (n = 0; n < loops; n++) {
-		if (mode == 1) {
-			transposeMatrix(a, at);
-			transposeMatrix(b, bt);
-			gpuTransExpandMultCollapseMatrices(at, bt, c);
-		} else if (mode == 2) {
-			gpuTransMultiplyMatrices(a, b, c);
-		}
-	}
-	clock_t end = clock();
-	PRINT_FLUSH(1, "GPU %lfs\n", clocksToSeconds(start, end));
-	start = clock();
 	for (n = 0; n < loops; n++) {
 		if (mode == 1) {
 			expandMultCollapseMatrices(a, b, d);
@@ -433,24 +413,17 @@ int testCandidate(int candidate) {
 			cpuTransMultiplyMatrices(a, b, d);
 		}
 	}
-	end = clock();
+	clock_t end = clock();
 	PRINT_FLUSH(1, "CPU %lfs\n", clocksToSeconds(start, end));
-	PRINT_FLUSH(1, "Error: %f\n", sumSquareMatrix(subtractMatrices(c, d, d)));
-
 
 	deleteMatrix(a);
 	deleteMatrix(b);
-	deleteMatrix(at);
-	deleteMatrix(bt);
-	deleteMatrix(c);
 	deleteMatrix(d);
 	pauseLike();
 	return 0;
 }
 
-//-t -l=1 -a=swarm "E:\A\Dropbox\Dev\Multiple\SubNet\test\test-experiment\rated.csv" 19 "E:\A\Dropbox\Dev\Multiple\SubNet\test\test-experiment\network.net"
-// "-t" "-r=30000" "-l=2" "-s=44,2,1" "-a=backprop" "E:\A\Dropbox\Dev\Multiple\SubNet\test\mal\rated-list.csv" "44" "E:\A\Dropbox\Dev\Multiple\SubNet\test\mal\network-few-hidden.net"
-// "-t" "-r=30000" "-l=2" "-s=44,2,1" "-a=backprop" "E:\A\Dropbox\Dev\Multiple\SubNet\test\mal\rated-list.csv" "44" "E:\A\Dropbox\Dev\Multiple\SubNet\test\mal\network-few-hidden.net"
+// "-t" "-r=30000" "-l=2" "-s=157,3,1" "-a=backprop" "E:\A\Dropbox\Dev\Multiple\SubNet\test\mal\rated-list.csv" "157" "E:\A\Dropbox\Dev\Multiple\SubNet\test\mal\network-few-hidden.net"
 int main(int argc, char *argv[]) {
 	clock_t start = clock();
 	int n;
@@ -460,7 +433,6 @@ int main(int argc, char *argv[]) {
 	}
 	PRINT_FLUSH(1, "\n")
 	int result;
-	clInit();
 	if (argc < 2) {
 		help();
 		result = 1;
@@ -482,7 +454,6 @@ int main(int argc, char *argv[]) {
 			result = 0;
 		}
 	}
-	clEnd();
 	clock_t end = clock();
 	PRINT_FLUSH(1, "Duration %lfs\n", clocksToSeconds(start, end));
 	//pauseLike();

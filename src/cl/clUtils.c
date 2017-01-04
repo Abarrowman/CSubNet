@@ -6,7 +6,7 @@
 
 #include <math.h>
 #include <stdlib.h>
-#include "utils.h"
+#include "../utils.h"
 #include "clUtils.h"
 
 #define CL_UTILS_INCLUDE_DEBUGS 1

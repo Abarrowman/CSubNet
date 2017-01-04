@@ -43,17 +43,12 @@ matrix* elementMultMatrices(matrix* left, matrix *right, matrix* result);
 
 matrix* expandMultMatrices(matrix* left, matrix *right, matrix* result);
 matrix* expandMultCollapseMatrices(matrix* left, matrix *right, matrix* result);
-matrix* gpuTransExpandMultCollapseMatrices(matrix* left, matrix *right, matrix* result);
 
 
 matrix* transposeMatrix(matrix* original, matrix* result);
 matrix* transposeMatrixSelf(matrix* original, netF* extraData);
 
-
-
-matrix* transMultiplyMatrices(matrix* left, matrix *right, matrix* result);
 matrix* cpuTransMultiplyMatrices(matrix* left, matrix *right, matrix* result);
-matrix* gpuTransMultiplyMatrices(matrix* left, matrix *right, matrix* result);
 
 //misc
 matrix* writeMatrix(FILE *stream, matrix* mat, char colSep, char rowSep);

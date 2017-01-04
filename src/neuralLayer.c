@@ -7,11 +7,11 @@
 #include "utils.h"
 
 __inline netF layerSigmoid(netF input) {
-	return (input / (1 + fabs(input)) + 1) / 2;
+	return (netF)((input / (1 + fabs(input)) + 1) / 2);
 }
 
 __inline netF layerSigmoidDerivative(netF input) {
-	netF denom = (fabs(input) + 1);
+	netF denom = (netF)(fabs(input) + 1);
 	return 1 / (2 * denom * denom);
 }
 
@@ -47,7 +47,7 @@ static __inline void applySigmoid(netF* __restrict vals, int count) {
 }
 
 matrix* applyLayer(neuralLayer* layer, matrix* input, matrix* output, int shouldApplySigmoid, matrix* preOutput) {
-	transMultiplyMatrices(input, layer->matrix, output);
+	cpuTransMultiplyMatrices(input, layer->matrix, output);
 
 	if (output == NULL) {
 		return NULL;
