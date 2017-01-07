@@ -44,11 +44,11 @@ vector* scaleVectorSelf(vector* vec, netF mag) {
 
 vector* scaleVector(vector* vec, netF mag, vector* dest) {
 	netF totalMag = 0;
-	int i;
+	size_t i;
 	for (i = 0; i < vec->length; i++) {
 		totalMag += vec->vals[i] * vec->vals[i];
 	}
-	totalMag = sqrt(totalMag);
+	totalMag = sqrtf(totalMag);
 	for (i = 0; i < vec->length; i++) {
 		dest->vals[i] = vec->vals[i] / totalMag * mag;
 	}
@@ -69,7 +69,7 @@ vector* multiplyVectorSelf(vector* vec, netF scale) {
 }
 
 vector* multiplyVector(vector* vec, netF scale, vector* dest) {
-	int i;
+	size_t i;
 	for (i = 0; i < vec->length; i++) {
 		dest->vals[i] = vec->vals[i] * scale;
 	}
@@ -91,7 +91,7 @@ vector* addVectors(vector* left, vector* right, vector* dest) {
 		(len != dest->length)) {
 		return NULL;
 	}
-	int i;
+	size_t i;
 	for (i = 0; i < len; i++) {
 		dest->vals[i] = left->vals[i] + right->vals[i];
 	}
@@ -113,7 +113,7 @@ vector* subVectors(vector* left, vector* right, vector* dest) {
 		(len != dest->length)) {
 		return NULL;
 	}
-	int i;
+	size_t i;
 	for (i = 0; i < len; i++) {
 		dest->vals[i] = left->vals[i] - right->vals[i];
 	}
@@ -135,7 +135,7 @@ int doesVectorHaveNANs(vector* vec) {
 	if (vec == NULL) {
 		return 1;
 	}
-	int i;
+	size_t i;
 	for (i = 0; i < vec->length; i++) {
 		if (isnan(vec->vals[i])) {
 			return 1;

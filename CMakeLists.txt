@@ -3,12 +3,17 @@ project(CSubNet)
 enable_language(C)
 set(CMAKE_C_STANDARD 11)
 
+set(CMAKE_BUILD_TYPE RelWithDebInfo )
+
 include_directories(src)
 file(GLOB SOURCES "src/*.c")
 
 add_executable(CSubNet ${SOURCES})
 
-#link math library in linux
-IF( CMAKE_COMPILER_IS_GNUCC)
+IF(CMAKE_COMPILER_IS_GNUCC)
+	#GCC Options
+	#link math library
 	target_link_libraries(CSubNet m)
-ENDIF( CMAKE_COMPILER_IS_GNUCC)
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+	#MSVC Options
+ENDIF()

@@ -100,7 +100,7 @@ intResult parseIntFromCString(char* string) {
 
 intResult parseInt(stringFragment* frag) {
 	intResult r;
-	int n;
+	size_t n;
 	int val = 0;
 	int sign = 1;
 	for (n = 0; n < frag->length; n++) {
@@ -135,7 +135,7 @@ if ((c >= '0') && (c <= '9')) {\
 }
 
 netF parseNetFFromCString(char* string) {
-	int n = 0;
+	size_t n = 0;
 	netF val = 0;
 	int isDecimal = 0;
 	netF placeValue = 0.1f;
@@ -149,7 +149,7 @@ netF parseNetFFromCString(char* string) {
 }
 
 netF parseNetF(stringFragment* frag) {
-	int n;
+	size_t n;
 	netF val = 0;
 	int isDecimal = 0;
 	netF placeValue = 0.1f;
