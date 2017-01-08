@@ -55,6 +55,6 @@ matrix* writeMatrix(FILE *stream, matrix* mat, char colSep, char rowSep);
 void writeMatrixRow(FILE *stream, matrix* mat, char colSep, char rowSep, int row);
 matrix* printMatrix(matrix* mat);
 int doesMatrixHaveNANs(matrix* mat);
-
+void validateSuppliedMatrix(matrix* supplied, int height, int width);
 
 #endif

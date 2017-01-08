@@ -97,16 +97,14 @@ netF* getMatrixVal(matrix* mat, int row, int col) {
 	return &(mat->vals[mat->width * row + col]);
 }
 
-static matrix* createOrUseSuppliedMatrix(matrix* supplied, int height, int width) {
+void validateSuppliedMatrix(matrix* supplied, int height, int width) {
 	if (supplied == NULL) {
-		return createMatrix(height, width);
+		PRINT_FLUSH(1, "Supplied matrix is NULL.");
+		exit(1);
 	} else if ((supplied->width != width) || (supplied->height != height)) {
 		PRINT_FLUSH(1, "Supplied matrix is of the wrong size %dx%d instead of %dx%d",
 			supplied->height, supplied->width, height, width);
 		exit(1);
-		return NULL;
-	} else {
-		return supplied;
 	}
 }
 
@@ -135,10 +133,10 @@ matrix* multiplyMatrices(matrix* left, matrix* right, matrix* result) {
 		return NULL;
 	}
 
-	matrix* mat = createOrUseSuppliedMatrix(result, leftHeight, rightWidth);
+	validateSuppliedMatrix(result, leftHeight, rightWidth);
 
-	innerMultiplyMatrices(leftHeight, leftWidth, rightWidth, left->vals, right->vals, mat->vals);
-	return mat;
+	innerMultiplyMatrices(leftHeight, leftWidth, rightWidth, left->vals, right->vals, result->vals);
+	return result;
 }
 
 matrix* elementMultMatrices(matrix* left, matrix* right, matrix* result) {
@@ -149,13 +147,12 @@ matrix* elementMultMatrices(matrix* left, matrix* right, matrix* result) {
 	if ((leftWidth != rightWidth) || (leftHeight != rightHeight)) {
 		return NULL;
 	}
-	matrix* mat = createOrUseSuppliedMatrix(result, leftHeight, leftWidth);
-	netF* vals = mat->vals;
+	validateSuppliedMatrix(result, leftHeight, leftWidth);
 	int idx;
 	for (idx = 0; idx < leftWidth * leftHeight; idx++) {
-		mat->vals[idx] = left->vals[idx] * right->vals[idx];
+		result->vals[idx] = left->vals[idx] * right->vals[idx];
 	}
-	return mat;
+	return result;
 }
 
 matrix* expandMultMatrices(matrix* left, matrix* right, matrix* result) {
@@ -167,30 +164,29 @@ matrix* expandMultMatrices(matrix* left, matrix* right, matrix* result) {
 		return NULL;
 	}
 	int totalWidth = leftWidth * rightWidth;
-	matrix* mat = createOrUseSuppliedMatrix(result, leftHeight, totalWidth);
-	netF* vals = mat->vals;
+	validateSuppliedMatrix(result, leftHeight, totalWidth);
 	int row;
 	for (row = 0; row < leftHeight; row++) {
 		int leftCol;
 		for (leftCol = 0; leftCol < leftWidth; leftCol++) {
 			int rightCol;
 			for (rightCol = 0; rightCol < rightWidth; rightCol++) {
-				mat->vals[row * totalWidth + leftCol * rightWidth + rightCol] =
+				result->vals[row * totalWidth + leftCol * rightWidth + rightCol] =
 					left->vals[row * leftWidth + leftCol] * right->vals[row * rightWidth + rightCol];
 			}
 		}
 	}
-	return mat;
+	return result;
 }
 
-static __inline netF dotProduct(netF* left, netF* right, const int count) {
-	netF sum = 0;
-	int idx = 0;
-	for (idx = 0; idx < count; idx++) {
-		sum += left[idx] * right[idx];
-	}
-	return sum;
-}
+//static __inline netF dotProduct(netF* left, netF* right, const int count) {
+//	netF sum = 0;
+//	int idx = 0;
+//	for (idx = 0; idx < count; idx++) {
+//		sum += left[idx] * right[idx];
+//	}
+//	return sum;
+//}
 
 static __inline netF fastDotProduct(netF* left, netF* right, const int rounds, const int rem) {
 	int n;
@@ -232,25 +228,25 @@ matrix* expandMultCollapseMatrices(matrix* left, matrix *right, matrix* result) 
 		return NULL;
 	}
 	int totalWidth = leftWidth * rightWidth;
-	matrix* mat = createOrUseSuppliedMatrix(result, 1, totalWidth);
-	fillMatrixZero(mat);
-	netF* vals = mat->vals;
+	validateSuppliedMatrix(result, 1, totalWidth);
+	fillMatrixZero(result);
 	int row;
+	#pragma omp parallel for default(shared) private(row) schedule(static)
 	for (row = 0; row < leftHeight; row++) {
 		int leftCol;
 		for (leftCol = 0; leftCol < leftWidth; leftCol++) {
 			netF leftVal = left->vals[row * leftWidth + leftCol];
 			int rightCol;
 			for (rightCol = 0; rightCol < rightWidth; rightCol++) {
-				mat->vals[leftCol * rightWidth + rightCol] += leftVal * right->vals[row * rightWidth + rightCol];
+				result->vals[leftCol * rightWidth + rightCol] += leftVal * right->vals[row * rightWidth + rightCol];
 			}
 		}
 	}
 	int col;
 	for (col = 0; col < totalWidth; col++) {
-		mat->vals[col] /= leftHeight;
+		result->vals[col] /= leftHeight;
 	}
-	return mat;
+	return result;
 }
 
 
@@ -259,7 +255,7 @@ static __inline void innerTransMultiplyMatrices(const int leftHeight, const int 
 	const int rem = leftWidth & 0x3;
 	int row;
 	int col;
-	//#pragma omp parallel for default(shared) private(row, col) schedule(static)
+	#pragma omp parallel for default(shared) private(row, col) schedule(static)
 	for (row = 0; row < leftHeight; row++) {
 		for (col = 0; col < rightHeight; col++) {
 			matVals[row * rightHeight + col] = fastDotProduct(leftVals + row * leftWidth, rightVals + leftWidth * col, rounds, rem);
@@ -275,41 +271,41 @@ matrix* cpuTransMultiplyMatrices(matrix* left, matrix* right, matrix* result) {
 	if (leftWidth != rightWidth) {
 		return NULL;
 	}
-	matrix* mat = createOrUseSuppliedMatrix(result, leftHeight, rightHeight);
-	innerTransMultiplyMatrices(leftHeight, leftWidth, rightHeight, left->vals, right->vals, mat->vals);
-	return mat;
+	validateSuppliedMatrix(result, leftHeight, rightHeight);
+	innerTransMultiplyMatrices(leftHeight, leftWidth, rightHeight, left->vals, right->vals, result->vals);
+	return result;
 }
 
 matrix* subtractMatrices(matrix* left, matrix* right, matrix* result) {
 	if ((left->width != right->width) || (left->height != right->height)) {
 		return NULL;
 	}
-	matrix* mat = createOrUseSuppliedMatrix(result, left->height, left->width);
+	validateSuppliedMatrix(result, left->height, left->width);
 	int row;
-	for (row = 0; row < mat->height; row++) {
+	for (row = 0; row < result->height; row++) {
 		int col;
-		for (col = 0; col < mat->width;col++) {
-			int idx = row * mat->width + col;
-			mat->vals[idx] = left->vals[idx] - right->vals[idx];
+		for (col = 0; col < result->width;col++) {
+			int idx = row * result->width + col;
+			result->vals[idx] = left->vals[idx] - right->vals[idx];
 		}
 	}
-	return mat;
+	return result;
 }
 
 matrix* addMatrices(matrix* left, matrix* right, matrix* result) {
 	if ((left->width != right->width) || (left->height != right->height)) {
 		return NULL;
 	}
-	matrix* mat = createOrUseSuppliedMatrix(result, left->height, left->width);
+	validateSuppliedMatrix(result, left->height, left->width);
 	int row;
-	for (row = 0; row < mat->height; row++) {
+	for (row = 0; row < result->height; row++) {
 		int col;
-		for (col = 0; col < mat->width;col++) {
-			int idx = row * mat->width + col;
-			mat->vals[idx] = left->vals[idx] + right->vals[idx];
+		for (col = 0; col < result->width;col++) {
+			int idx = row * result->width + col;
+			result->vals[idx] = left->vals[idx] + right->vals[idx];
 		}
 	}
-	return mat;
+	return result;
 }
 
 static __inline void innerTransposeMatrix(netF* original, netF* result, int originalHigh, int originalWide) {
@@ -323,9 +319,9 @@ static __inline void innerTransposeMatrix(netF* original, netF* result, int orig
 }
 
 matrix* transposeMatrix(matrix* original, matrix* result) {
-	matrix* mat = createOrUseSuppliedMatrix(result, original->width, original->height);
+	validateSuppliedMatrix(result, original->width, original->height);
 	innerTransposeMatrix(original->vals, result->vals, original->height, original->width);
-	return mat;
+	return result;
 }
 
 matrix* transposeMatrixSelf(matrix* original, netF* extraData) {
@@ -347,26 +343,26 @@ netF sumSquareMatrix(matrix* mat) {
 }
 
 matrix* cloneMatrix(matrix* original, matrix* result) {
-	matrix* mat = createOrUseSuppliedMatrix(result, original->height, original->width);
-	return setMatrixValues(mat, original->vals);
+	validateSuppliedMatrix(result, original->height, original->width);
+	return setMatrixValues(result, original->vals);
 }
 
 matrix* agumentMatrix(matrix* left, matrix* right, matrix* result) {
 	if (left->height != right->height) {
 		return NULL;
 	}
-	matrix* mat = createOrUseSuppliedMatrix(result, left->height, left->width + right->width);
+	validateSuppliedMatrix(result, left->height, left->width + right->width);
 	int yn;
 	for (yn = 0; yn < left->height; yn++) {
 		int xn;
 		for (xn = 0; xn < left->width; xn++) {
-			setMatrixVal(mat, yn, xn, *getMatrixVal(left, yn, xn));
+			setMatrixVal(result, yn, xn, *getMatrixVal(left, yn, xn));
 		}
 		for (xn = 0; xn < right->width; xn++) {
-			setMatrixVal(mat, yn, left->width + xn, *getMatrixVal(right, yn, xn));
+			setMatrixVal(result, yn, left->width + xn, *getMatrixVal(right, yn, xn));
 		}
 	}
-	return mat;
+	return result;
 }
 
 int doesMatrixHaveNANs(matrix* mat) {

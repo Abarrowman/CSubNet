@@ -170,10 +170,10 @@ static vector* copyNetworkToVector(neuralNetwork* net, vector* vec) {
 	return vec;
 }
 
-static vector* networkAsVector(neuralNetwork* net) {
-	vector* vec = createVector(countNetworkParameters(net));
-	return copyNetworkToVector(net, vec);
-}
+//static vector* networkAsVector(neuralNetwork* net) {
+//	vector* vec = createVector(countNetworkParameters(net));
+//	return copyNetworkToVector(net, vec);
+//}
 
 netOptSettings* initNetOptSettings(netOptSettings* settings) {
 	settings->algorithm = 0;
@@ -239,8 +239,8 @@ neuralNetwork* backPropNetwork(neuralNetwork* original, trainingData* train, net
 		initMatrix(weightDers + n, 1, getLayerOutputs(original->layers[n]) * getLayerInputs(original->layers[n]));
 	}
 
-	netF initialError;
-	netF rmsError;
+	netF initialError = 0;
+	netF rmsError = 0;
 	int round;
 	for (round = 0; round < settings->maxRounds; round++) {
 		applyNetworkForBackprop(current, train->input, output, intermediates, layerErrors);
@@ -413,7 +413,6 @@ neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train
 	START_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates, initialError, bestStateError)
 
 	int maxCycles = settings->maxRounds;
-	netF initStepSize = 0.5;
 
 	int netFCount = countNetworkParameters(original);
 	vector* changeVector = createVector(netFCount);

@@ -10,10 +10,12 @@ file(GLOB SOURCES "src/*.c")
 
 add_executable(CSubNet ${SOURCES})
 
-IF(CMAKE_COMPILER_IS_GNUCC)
+if(CMAKE_COMPILER_IS_GNUCC)
 	#GCC Options
 	#link math library
 	target_link_libraries(CSubNet m)
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -ffast-math -march=native -fopenmp")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 	#MSVC Options
-ENDIF()
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /Ox /fp:fast /arch:SSE2 /openmp")
+endif()

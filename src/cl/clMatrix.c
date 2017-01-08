@@ -62,11 +62,11 @@ matrix* gpuTransExpandMultCollapseMatrices(
 		return NULL;
 	}
 	int totalWidth = leftHeight * rightHeight;
-	matrix* mat = createOrUseSuppliedMatrix(result, 1, totalWidth);
+	validateSuppliedMatrix(result, 1, totalWidth);
 	innerCLTransExpandMultiplyMatrices(leftHeight, rightHeight, leftWidth,
-		left->vals, right->vals, mat->vals);
+		left->vals, right->vals, result->vals);
 
-	return mat;
+	return result;
 }
 
 static __inline void innerCLTransMultiplyMatrices(const int leftHeight,
@@ -125,8 +125,8 @@ matrix* gpuTransMultiplyMatrices(matrix* left, matrix* right, matrix* result) {
 	if (leftWidth != rightWidth) {
 		return NULL;
 	}
-	matrix* mat = createOrUseSuppliedMatrix(result, leftHeight, rightHeight);
+	validateSuppliedMatrix(result, leftHeight, rightHeight);
 	innerCLTransMultiplyMatrices(leftHeight, leftWidth, rightHeight, left->vals,
-		right->vals, mat->vals);
-	return mat;
+		right->vals, result->vals);
+	return result;
 }

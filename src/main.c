@@ -366,7 +366,8 @@ int execute(int paramCount, char** params) {
 	matrix* out = applyNetwork(network, mat, NULL, NULL);
 	deleteNetwork(network);
 
-	matrix* augmented = agumentMatrix(mat, out, NULL);
+	matrix* augmented = agumentMatrix(mat, out,
+			createMatrix(mat->height, mat->width + out->width));
 	deleteMatrix(mat);
 	deleteMatrix(out);
 
