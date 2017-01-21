@@ -26,7 +26,7 @@ void help() {
 		"Rounds: -r=n\n"
 		"Layer Sizes: -s=v,w,x,y,z\n"
 		"Label Columns: -l=x\n"
-		"Algorithm: -a=[anneal,evolve,gradient,swarm]\n")
+		"Algorithm: -a=[anneal,evolve,gradient,swarm,backprop]\n")
 	pauseLike();
 }
 
@@ -386,32 +386,52 @@ int execute(int paramCount, char** params) {
 }
 
 int testCandidate(int candidate) {
-	int mode = 1;
-	int loops = 10;
-	int leftHeight = 1000;
-	int rightWidth = 1000;
-	int leftWidth = 1000;
+	int loops = 10000;
+
+	int leftHeight = 500;
+	int rightWidth = 500;
+	int leftWidth = 500;
+
+	//int leftHeight = 2;
+	//int rightWidth = 2;
+	//int leftWidth = 3;
 
 	matrix* a = createMatrix(leftHeight, leftWidth);
+	matrix* at = createMatrix(leftWidth, leftHeight);
+	//netF aVals[] = { 1, 2, 3,
+	//				 3, 6, 9};
+	//setMatrixValues(a, aVals);
 	fillMatrixRandom(a);
 
 	matrix* b = createMatrix(leftHeight, rightWidth);
+	matrix* bt = createMatrix(rightWidth, leftHeight);
+	//netF bVals[] = { 1, 2,
+	//				 2, 4 };
+	//setMatrixValues(b, bVals);
 	fillMatrixRandom(b);
 
 	matrix* d = NULL;
-	if (mode == 1) {
+	if (candidate == 1 || candidate == 2) {
 		d = createMatrix(1, leftWidth * rightWidth);
-	} else if (mode == 2) {
+	} else if (candidate == 3) {
 		d = createMatrix(leftHeight, leftHeight);
+	} else if (candidate == 4) {
+		d = createMatrix(1, 1);
 	}
 	
 	clock_t start = clock();
 	int n;
 	for (n = 0; n < loops; n++) {
-		if (mode == 1) {
+		if (candidate == 1) {
 			expandMultCollapseMatrices(a, b, d);
-		} else if (mode == 2) {
+		} else if (candidate == 2) {
+			transposeMatrix(a, at);
+			transposeMatrix(b, bt);
+			transExpandMultCollapseMatrices(at, bt, d);
+		} else if (candidate == 3) {
 			cpuTransMultiplyMatrices(a, b, d);
+		} else if (candidate == 4) {
+			transposeMatrix(a, b);
 		}
 	}
 	clock_t end = clock();
@@ -419,14 +439,15 @@ int testCandidate(int candidate) {
 
 	deleteMatrix(a);
 	deleteMatrix(b);
+	deleteMatrix(at);
+	deleteMatrix(bt);
 	deleteMatrix(d);
-	pauseLike();
 	return 0;
 }
 
-// "-t" "-r=30000" "-l=2" "-s=157,3,1" "-a=backprop" "E:\A\Dropbox\Dev\Multiple\SubNet\test\mal\rated-list.csv" "157" "E:\A\Dropbox\Dev\Multiple\SubNet\test\mal\network-few-hidden.net"
+//-t - l = 1 - s = 360, 60, 20, 1 - a = backprop - r = 1 E:\A\Dropbox\Dev\Multiple\SubNet\test\malname\sanity - list.csv 360 E:\A\Dropbox\Dev\Multiple\SubNet\test\malname\network.net
+//-t -r=10000 -l=2 -s=157,3,1 -a=backprop E:\A\Dropbox\Dev\Multiple\SubNet\test\mal\rated-list.csv 157 E:\A\Dropbox\Dev\Multiple\SubNet\test\mal\network-few-hidden.net
 int main(int argc, char *argv[]) {
-	clock_t start = clock();
 	int n;
 	for (n = 0; n < argc; n++) {
 		//PRINT_FLUSH(1, "Argument %d [%s]\n", n, argv[n])
@@ -446,7 +467,7 @@ int main(int argc, char *argv[]) {
 		} else if (strcmp(command, "-e") == 0) {
 			result = execute(argc - 2, &argv[2]);
 		} else if (strcmp(command, "-c") == 0) {
-			return 	testCandidate(1);
+			return 	testCandidate(4);
 		} else {
 			help();
 			if (strcmp(command, "-h") == 0) {
@@ -455,8 +476,6 @@ int main(int argc, char *argv[]) {
 			result = 0;
 		}
 	}
-	clock_t end = clock();
-	PRINT_FLUSH(1, "Duration %lfs\n", clocksToSeconds(start, end));
 	//pauseLike();
 	return result;
 }

@@ -43,6 +43,7 @@ matrix* elementMultMatrices(matrix* left, matrix *right, matrix* result);
 
 matrix* expandMultMatrices(matrix* left, matrix *right, matrix* result);
 matrix* expandMultCollapseMatrices(matrix* left, matrix *right, matrix* result);
+matrix* transExpandMultCollapseMatrices(matrix* left, matrix *right, matrix* result);
 
 
 matrix* transposeMatrix(matrix* original, matrix* result);

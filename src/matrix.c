@@ -108,7 +108,8 @@ void validateSuppliedMatrix(matrix* supplied, int height, int width) {
 	}
 }
 
-static __inline void innerMultiplyMatrices(const int leftHeight, const int leftWidth, const int rightWidth, netF* leftVals, netF* rightVals, netF* matVals) {
+static __inline void innerMultiplyMatrices(const int leftHeight, const int leftWidth, const int rightWidth,
+	const netF* leftVals, const netF* rightVals, netF* matVals) {
 	int row;
 	for (row = 0; row < leftHeight; row++) {
 		int col;
@@ -179,46 +180,6 @@ matrix* expandMultMatrices(matrix* left, matrix* right, matrix* result) {
 	return result;
 }
 
-//static __inline netF dotProduct(netF* left, netF* right, const int count) {
-//	netF sum = 0;
-//	int idx = 0;
-//	for (idx = 0; idx < count; idx++) {
-//		sum += left[idx] * right[idx];
-//	}
-//	return sum;
-//}
-
-static __inline netF fastDotProduct(netF* left, netF* right, const int rounds, const int rem) {
-	int n;
-	int idx = 0;
-	netF sum = 0;
-	for (n = rounds; n--;) {
-		sum += left[idx] * right[idx];
-		idx++;
-		sum += left[idx] * right[idx];
-		idx++;
-		sum += left[idx] * right[idx];
-		idx++;
-		sum += left[idx] * right[idx];
-		idx++;
-	}
-	switch (rem)
-	{
-	case 3:
-		sum += left[idx] * right[idx];
-		idx++;
-		/* no break */
-	case 2:
-		sum += left[idx] * right[idx];
-		idx++;
-		/* no break */
-	case 1:
-		sum += left[idx] * right[idx];
-		idx++;
-	}
-	return sum;
-}
-
 matrix* expandMultCollapseMatrices(matrix* left, matrix *right, matrix* result) {
 	int leftWidth = left->width;
 	int leftHeight = left->height;
@@ -231,7 +192,6 @@ matrix* expandMultCollapseMatrices(matrix* left, matrix *right, matrix* result) 
 	validateSuppliedMatrix(result, 1, totalWidth);
 	fillMatrixZero(result);
 	int row;
-	#pragma omp parallel for default(shared) private(row) schedule(static)
 	for (row = 0; row < leftHeight; row++) {
 		int leftCol;
 		for (leftCol = 0; leftCol < leftWidth; leftCol++) {
@@ -249,16 +209,58 @@ matrix* expandMultCollapseMatrices(matrix* left, matrix *right, matrix* result) 
 	return result;
 }
 
+static __inline netF dotProduct(const netF* left, const netF* right, const int count) {
+	netF sum = 0;
+	int idx = 0;
+	for (idx = 0; idx < count; idx++) {
+		sum += left[idx] * right[idx];
+	}
+	return sum;
+}
 
-static __inline void innerTransMultiplyMatrices(const int leftHeight, const int leftWidth, const int rightHeight, netF* leftVals, netF* rightVals, netF* matVals) {
-	const int rounds = leftWidth >> 2;
-	const int rem = leftWidth & 0x3;
-	int row;
+static __inline void innerTransExpandMultCollapseMatrices(const int leftHeight, const int rightHeight,
+		const int leftWidth, const netF* leftVals, const netF* rightVals, netF* result) {
+	int leftRow;
+	#pragma omp parallel for schedule(dynamic, 16)
+	for (leftRow = 0; leftRow < leftHeight; leftRow++) {
+		int rightRow = 0;
+		for (rightRow = 0; rightRow < rightHeight; rightRow++) {
+			netF sum = 0;
+			result[leftRow * rightHeight + rightRow] = dotProduct(
+				leftVals + leftRow * leftWidth, rightVals + rightRow * leftWidth, leftWidth);
+		}
+	}
+}
+
+matrix* transExpandMultCollapseMatrices(matrix* left, matrix *right, matrix* result) {
+	int leftWidth = left->width;
+	int leftHeight = left->height;
+	int rightWidth = right->width;
+	int rightHeight = right->height;
+	if (leftWidth != rightWidth) {
+		return NULL;
+	}
+	int totalHeight = leftHeight * rightHeight;
+	validateSuppliedMatrix(result, 1, totalHeight);
+
+	innerTransExpandMultCollapseMatrices(leftHeight, rightHeight,
+		leftWidth, left->vals, right->vals, result->vals);
+
 	int col;
-	#pragma omp parallel for default(shared) private(row, col) schedule(static)
+	for (col = 0; col < totalHeight; col++) {
+		result->vals[col] /= leftWidth;
+	}
+	return result;
+}
+
+static __inline void innerTransMultiplyMatrices(const int leftHeight, const int leftWidth, const int rightHeight,
+		const netF* leftVals, const netF* rightVals, netF* matVals) {
+	int row;
+	#pragma omp parallel for schedule(dynamic, 16)
 	for (row = 0; row < leftHeight; row++) {
-		for (col = 0; col < rightHeight; col++) {
-			matVals[row * rightHeight + col] = fastDotProduct(leftVals + row * leftWidth, rightVals + leftWidth * col, rounds, rem);
+		for (int col = 0; col < rightHeight; col++) {
+			matVals[row * rightHeight + col] = dotProduct(
+				leftVals + row * leftWidth, rightVals + leftWidth * col, leftWidth);
 		}
 	}
 }
@@ -308,12 +310,20 @@ matrix* addMatrices(matrix* left, matrix* right, matrix* result) {
 	return result;
 }
 
-static __inline void innerTransposeMatrix(netF* original, netF* result, int originalHigh, int originalWide) {
-	int row;
-	for (row = 0; row < originalHigh; row++) {
-		int col;
-		for (col = 0; col < originalWide; col++) {
-			result[col * originalHigh + row] = original[row * originalWide + col];
+static __inline void innerTransposeMatrix(const netF* original, netF* result, const int origHigh,
+		const int origWide) {
+	/*
+	Transpose blocks of the matrix at a time which is slightly cache friendlier for large matrices.
+	*/
+	const int block = 32;
+	int rowBlock;
+	for (rowBlock = 0; rowBlock < origHigh; rowBlock += block) {
+		for (int colBlock = 0; colBlock < origWide; colBlock += block) {
+			for (int row = rowBlock; row < rowBlock + block && row < origHigh; row++) {
+				for (int col = colBlock; col < colBlock + block && col < origWide; col++) {
+					result[col * origHigh + row] = original[row * origWide + col];
+				}
+			}
 		}
 	}
 }

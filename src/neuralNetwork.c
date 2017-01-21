@@ -233,10 +233,18 @@ neuralNetwork* backPropNetwork(neuralNetwork* original, trainingData* train, net
 	matrix* layerErrors = malloc(sizeof(matrix) * numLayers);
 	matrix* weightDers = malloc(sizeof(matrix) * numLayers);
 	matrix* layerExtras = malloc(sizeof(matrix) * numLayers);
+	matrix* transInters = malloc(sizeof(matrix) * numLayers);
 	for (n = 0; n < numLayers; n++) {
 		initMatrix(layerExtras + n, numTrains, getLayerOutputs(original->layers[n]));
 		initMatrix(layerErrors + n, numTrains, getLayerOutputs(original->layers[n]));
 		initMatrix(weightDers + n, 1, getLayerOutputs(original->layers[n]) * getLayerInputs(original->layers[n]));
+
+		if (n == 0) {
+			initMatrix(transInters, train->input->width, train->input->height);
+		} else {
+			matrix* currentInter = intermediates + n - 1;
+			initMatrix(transInters + n, currentInter->width, currentInter->height);
+		}
 	}
 
 	netF initialError = 0;
@@ -273,11 +281,23 @@ neuralNetwork* backPropNetwork(neuralNetwork* original, trainingData* train, net
 		for (n = 0; n < numLayers; n++) {
 			layerEr = layerErrors + n;
 			matrix* weightDer = weightDers + n;
+
+			matrix* transLayerEr = layerExtras + n;
+			matrix* transInter = transInters + n;
+			transLayerEr->width = layerEr->height;
+			transLayerEr->height = layerEr->width;
+			transposeMatrix(layerEr, transLayerEr);
+
 			if (n == 0) {
-				expandMultCollapseMatrices(layerEr, train->input, weightDer);
+				transposeMatrix(train->input, transInter);
 			} else {
-				expandMultCollapseMatrices(layerEr, intermediates + (n - 1), weightDer);
+				transposeMatrix(intermediates + n - 1, transInter);
 			}
+
+			transExpandMultCollapseMatrices(transLayerEr, transInter, weightDer);
+			transLayerEr->height = layerEr->height;
+			transLayerEr->width = layerEr->width;
+
 			//these averages are slow and could be made faster
 			//weights
 			int col;

@@ -81,7 +81,7 @@ neuralLayer* cloneLayer(neuralLayer* original, neuralLayer* result) {
 neuralLayer* createLayer(int inputs, int outputs) {
 	neuralLayer* layer = (neuralLayer*)malloc(sizeof(neuralLayer));
 	layer->matrix = createIdentityMatrix(outputs, inputs);
-
+	fillMatrixRandom(layer->matrix); //randomize matrix
 	layer->biases = (netF*)calloc(outputs, sizeof(netF)); //unbaised
 	return layer;
 }

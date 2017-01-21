@@ -9,5 +9,5 @@ cmake ..
 # linux
 make
 # windows
-msbuild CSubNet.sln
+msbuild /p:Configuration=RelWithDebInfo CSubNet.sln
 ```
