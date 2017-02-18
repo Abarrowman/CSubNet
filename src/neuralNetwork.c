@@ -96,7 +96,7 @@ static neuralNetwork* mutateNetwork(neuralNetwork* mutant, netF mutationSize) {
 }
 
 static neuralNetwork* finishOptimizingNetwork(neuralNetwork* original, neuralNetwork* current,
-		neuralNetwork* best, neuralNetwork* mutant, neuralNetwork* output, matrix* intermediates) {
+		neuralNetwork* best, neuralNetwork* mutant, matrix* output, matrix* intermediates) {
 	deleteNetwork(current);
 	deleteNetwork(mutant);
 	deleteMatrix(output);
