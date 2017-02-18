@@ -70,17 +70,15 @@ stringFragment readFileIntoMemory(char* fileName, int maxSize) {
 	return frag;
 }
 
-#define PARSE_INT_INNER_LOOP(c, val, r, n) \
-if ((c >= '0') && (c <= '9')) {\
-	c -= '0';\
-	val *= 10;\
-	val += c;\
-} else if ((n == 0) && (c == '-')) {\
-	sign = -1;\
-} else {\
-	r.result = 0;\
-	r.ok = 0;\
-	return r;\
+static void parseIntInnerLoop(char c, int* val, int* sign, intResult* r, int n) {
+	if ((c >= '0') && (c <= '9')) {
+		c -= '0';
+		*val = 10 * (*val) + c;
+	} else if ((n == 0) && (c == '-')) {
+		*sign = -1;
+	} else {
+		r->ok = 0;
+	}
 }
 
 intResult parseIntFromCString(char* string) {
@@ -89,12 +87,12 @@ intResult parseIntFromCString(char* string) {
 	int val = 0;
 	int sign = 1;
 	char c;
-	while((c = string[n])) {
-		PARSE_INT_INNER_LOOP(c, val, r, n)
+	r.ok = 1;
+	while((c = string[n]) && r.ok) {
+		parseIntInnerLoop(c, &val, &sign, &r, n);
 		n++;
 	}
 	r.result = val * sign;
-	r.ok = 1;
 	return r;
 }
 
@@ -103,35 +101,36 @@ intResult parseInt(stringFragment* frag) {
 	size_t n;
 	int val = 0;
 	int sign = 1;
-	for (n = 0; n < frag->length; n++) {
+	r.ok = 1;
+	for (n = 0; (n < frag->length) && r.ok; n++) {
 		char c = frag->start[n];
-		PARSE_INT_INNER_LOOP(c, val, r, n)
+		parseIntInnerLoop(c, &val, &sign, &r, n);
 	}
 	r.result = val * sign;
-	r.ok = 1;
 	return r;
 }
 
-#define PARSE_NETF_INNER_LOOP(c, val, isDecimal, placeValue, sign, n) \
-if ((c >= '0') && (c <= '9')) {\
-	c -= '0';\
-	if (isDecimal) {\
-		val += placeValue * c;\
-		placeValue *= 0.1f;\
-	} else {\
-		val *= 10;\
-		val += c;\
-	}\
-} else if (c == '.') {\
-	if (isDecimal) {\
-		return NAN;\
-	} else {\
-		isDecimal = 1;\
-	}\
-} else if ((n == 0) && (c == '-')) {\
-	sign = -1;\
-} else {\
-	return NAN;\
+static void parseNetfInnerLoop(char c, netF* val, int* isDecimal,
+		netF* placeValue, netF* sign, int* ok, size_t n) {
+	if ((c >= '0') && (c <= '9')) {
+		c -= '0'; 
+		if (*isDecimal) {
+			*val += *placeValue * c;
+			*placeValue *= 0.1f;
+		} else {
+			*val = 10 * (*val) + c;
+		}
+	} else if (c == '.') {
+		if (*isDecimal) {
+			*ok = 0;
+		} else {
+			*isDecimal = 1;
+		}
+	} else if ((n == 0) && (c == '-')) {
+		*sign = -1;
+	} else {
+		*ok = 0;
+	}
 }
 
 netF parseNetFFromCString(char* string) {
@@ -140,12 +139,17 @@ netF parseNetFFromCString(char* string) {
 	int isDecimal = 0;
 	netF placeValue = 0.1f;
 	netF sign = 1;
+	int ok = 1;
 	char c;
-	while ((c = string[n])) {
-		PARSE_NETF_INNER_LOOP(c, val, isDecimal, placeValue, sign, n)
+	while ((c = string[n]) && ok) {
+		parseNetfInnerLoop(c, &val, &isDecimal, &placeValue, &sign, &ok, n);
 		n++;
 	}
-	return val * sign;
+	if (ok) {
+		return val * sign;
+	} else {
+		return NAN;
+	}
 }
 
 netF parseNetF(stringFragment* frag) {
@@ -154,11 +158,16 @@ netF parseNetF(stringFragment* frag) {
 	int isDecimal = 0;
 	netF placeValue = 0.1f;
 	netF sign = 1;
-	for (n = 0; n < frag->length; n++) {
+	int ok = 1;
+	for (n = 0; (n < frag->length) && ok; n++) {
 		char c = frag->start[n];
-		PARSE_NETF_INNER_LOOP(c, val, isDecimal, placeValue, sign, n)
+		parseNetfInnerLoop(c, &val, &isDecimal, &placeValue, &sign, &ok, n);
 	}
-	return val * sign;
+	if (ok) {
+		return val * sign;
+	} else {
+		return NAN;
+	}
 }
 
 stringFragment cStringToFragment(char* cString) {

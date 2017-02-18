@@ -11,7 +11,8 @@
 #include <string.h>
 
 #define NEURAL_NETWORK_INCLUDE_DEBUG_LOGS 1
-#define MAX_NEURAL_NETWORK_SIZE (1024 * 1024 * 10)
+#define MAX_NEURAL_NETWORK_SIZE (1024 * 1024 * 100)
+#define NEURAL_NETWORK_LOG_ROUND_INTERVAL (1000)
 
 static void deleteIntermediates(matrix* intermediates, neuralNetwork* network) {
 	int idx;
@@ -94,22 +95,14 @@ static neuralNetwork* mutateNetwork(neuralNetwork* mutant, netF mutationSize) {
 	return mutant;
 }
 
-#define START_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates, initialError, bestStateError) \
-neuralNetwork* current = cloneNeuralNetwork(original); \
-neuralNetwork* best = cloneNeuralNetwork(original); \
-neuralNetwork* mutant = cloneNeuralNetwork(original); \
-matrix* output = createMatrix(train->output->height, getNetworkOutputs(original)); \
-matrix* intermediates = createNetworkIntermediates(original, getTrainingDataCount(train)); \
-netF initialError = calculateTrainingDataError(original, train, output, intermediates); \
-PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Initial %f%%\n", initialError * 100) \
-netF bestStateError = initialError;
-
-#define FINISH_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates) \
-deleteNetwork(current); \
-deleteNetwork(mutant); \
-deleteMatrix(output); \
-deleteIntermediates(intermediates, original); \
-return best;
+static neuralNetwork* finishOptimizingNetwork(neuralNetwork* original, neuralNetwork* current,
+		neuralNetwork* best, neuralNetwork* mutant, neuralNetwork* output, matrix* intermediates) {
+	deleteNetwork(current);
+	deleteNetwork(mutant);
+	deleteMatrix(output);
+	deleteIntermediates(intermediates, original);
+	return best;
+}
 
 static neuralNetwork* addVectorToNetwork(vector* change, neuralNetwork* net) {
 	int layerIdx;
@@ -181,6 +174,9 @@ netOptSettings* initNetOptSettings(netOptSettings* settings) {
 	settings->coolRounds = 150000;
 	settings->particleCount = 100;
 	settings->childCount = 1000;
+	settings->portionTrain = 0;
+
+	settings->labelColumns = 0;
 	return settings;
 }
 
@@ -215,15 +211,32 @@ matrix* applyNetworkForBackprop(neuralNetwork* network, matrix* input, matrix* o
 	return output;
 }
 
-neuralNetwork* backPropNetwork(neuralNetwork* original, trainingData* train, netOptSettings* settings) {
+neuralNetwork* backPropNetwork(neuralNetwork* original, trainingData* allTrain, netOptSettings* settings) {
 	neuralNetwork* current = cloneNeuralNetwork(original);
-	matrix* output = createMatrix(train->output->height, getNetworkOutputs(original));
-	matrix* extra = createMatrix(train->output->height, getNetworkOutputs(original));
-	matrix* intermediates = createNetworkIntermediates(original, getTrainingDataCount(train));
+
+	int allTrainCount = getTrainingDataCount(allTrain);
+	int portionTrain = settings->portionTrain;
+	trainingData train;
+	int numTrains;
+	int* rowIdxs = NULL;
+	if (portionTrain) {
+		numTrains = portionTrain;
+		train.input = createMatrix(numTrains, getTrainingDataIntputs(allTrain));
+		train.output = createMatrix(numTrains, getTrainingDataOutputs(allTrain));
+		rowIdxs = malloc(sizeof(int) * numTrains);
+	} else {
+		train = *allTrain;
+		numTrains = allTrainCount;
+	}
+
+	matrix* output = createMatrix(train.output->height, getNetworkOutputs(original));
+	matrix* extra = createMatrix(train.output->height, getNetworkOutputs(original));
+
+
+	matrix* intermediates = createNetworkIntermediates(original, numTrains);
 
 	
 	int numLayers = original->numLayers;
-	int numTrains = getTrainingDataCount(train);
 	int paramCount = countNetworkParameters(original);
 	vector* changeVector = createVector(paramCount);
 
@@ -240,7 +253,7 @@ neuralNetwork* backPropNetwork(neuralNetwork* original, trainingData* train, net
 		initMatrix(weightDers + n, 1, getLayerOutputs(original->layers[n]) * getLayerInputs(original->layers[n]));
 
 		if (n == 0) {
-			initMatrix(transInters, train->input->width, train->input->height);
+			initMatrix(transInters, train.input->width, train.input->height);
 		} else {
 			matrix* currentInter = intermediates + n - 1;
 			initMatrix(transInters + n, currentInter->width, currentInter->height);
@@ -251,19 +264,30 @@ neuralNetwork* backPropNetwork(neuralNetwork* original, trainingData* train, net
 	netF rmsError = 0;
 	int round;
 	for (round = 0; round < settings->maxRounds; round++) {
-		applyNetworkForBackprop(current, train->input, output, intermediates, layerErrors);
-		subtractMatrices(output, train->output, extra);
+
+		//select training data for round
+		if (portionTrain) {
+			for (int r = 0; r < numTrains; r++) {
+				//rowIdxs[r] = (r + round * numTrains) % allTrainCount;
+				rowIdxs[r] = randomInt(0, allTrainCount - 1);
+			}
+			copyMatrixRows(allTrain->input, train.input, rowIdxs);
+			copyMatrixRows(allTrain->output, train.output, rowIdxs);
+		}
+
+		applyNetworkForBackprop(current, train.input, output, intermediates, layerErrors);
+		subtractMatrices(output, train.output, extra);
 		netF error = sumSquareMatrix(extra) / (2 * extra->height * extra->width);
 		rmsError = sqrtf(error * 2);
 		if (round == 0) {
 			initialError = rmsError;
 			PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Initial %f%%\n", initialError * 100)
-		} else if (round % 1000 == 0){
-			PRINT_FLUSH(1, "Cycle %d Initial %f%% Current %f%% \n", round, initialError * 100, rmsError * 100)
+		} else if (round % NEURAL_NETWORK_LOG_ROUND_INTERVAL == 0){
+			PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Cycle %d Initial %f%% Current %f%% \n", round, initialError * 100, rmsError * 100)
 		}
 
 		matrix* layExtra = layerExtras + (numLayers - 1);
-		subtractMatrices(output, train->output, layExtra);
+		subtractMatrices(output, train.output, layExtra);
 		matrix* layerEr = layerErrors + (numLayers - 1);
 		layer = current->layers[current->numLayers - 1];
 		elementMultMatrices(layExtra, calculateLayerOutputDerrivative(layer, layerEr), layerEr);
@@ -289,7 +313,7 @@ neuralNetwork* backPropNetwork(neuralNetwork* original, trainingData* train, net
 			transposeMatrix(layerEr, transLayerEr);
 
 			if (n == 0) {
-				transposeMatrix(train->input, transInter);
+				transposeMatrix(train.input, transInter);
 			} else {
 				transposeMatrix(intermediates + n - 1, transInter);
 			}
@@ -316,7 +340,11 @@ neuralNetwork* backPropNetwork(neuralNetwork* original, trainingData* train, net
 				changeIdx++;
 			}
 		}
-		multiplyVectorSelf(changeVector, -0.5f);
+		if (portionTrain) {
+			multiplyVectorSelf(changeVector, -3.0f);
+		} else {
+			multiplyVectorSelf(changeVector, -0.5f);
+		}
 		addVectorToNetwork(changeVector, current);
 	}
 	PRINT_FLUSH(1, "Cycle %d Initial %f%% Best %f%% \n", round, initialError * 100, rmsError * 100)
@@ -326,6 +354,11 @@ neuralNetwork* backPropNetwork(neuralNetwork* original, trainingData* train, net
 		clearMatrix(layerErrors + n);
 		clearMatrix(layerExtras + n);
 		clearMatrix(weightDers + n);
+	}
+	if (portionTrain) {
+		free(rowIdxs);
+		free(train.input);
+		free(train.output);
 	}
 	free(layerExtras);
 	free(weightDers);
@@ -404,7 +437,7 @@ neuralNetwork* swarmOptimizeNetwork(neuralNetwork* original, trainingData* train
 			copyNeuralNetwork(mutant, best);
 			copyVector(location, bestLoc);
 		}
-		if (cycle % 10000 == 0) {
+		if (cycle % NEURAL_NETWORK_LOG_ROUND_INTERVAL == 0) {
 			PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Cycle %d Best %f%% Mut %f%%\n", cycle,
 				bestStateError * 100, mutantStateError * 100)
 		}
@@ -430,7 +463,14 @@ neuralNetwork* swarmOptimizeNetwork(neuralNetwork* original, trainingData* train
 }
 
 neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train, netOptSettings* settings) {
-	START_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates, initialError, bestStateError)
+	neuralNetwork* current = cloneNeuralNetwork(original);
+	neuralNetwork* best = cloneNeuralNetwork(original);
+	neuralNetwork* mutant = cloneNeuralNetwork(original);
+	matrix* output = createMatrix(train->output->height, getNetworkOutputs(original));
+	matrix* intermediates = createNetworkIntermediates(original, getTrainingDataCount(train));
+	netF initialError = calculateTrainingDataError(original, train, output, intermediates);
+	PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Initial %f%%\n", initialError * 100)
+	netF bestStateError = initialError;
 
 	int maxCycles = settings->maxRounds;
 
@@ -516,18 +556,25 @@ neuralNetwork* gradientClimbNetwork(neuralNetwork* original, trainingData* train
 				isBias = 1;
 			}
 		}
-		if (cycle % 10000 == 0) {
+		if (cycle % NEURAL_NETWORK_LOG_ROUND_INTERVAL == 0) {
 			PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Cycle %d Step Size %f Best %f%% Curr %f%% Mut %f%%\n", cycle, stepSize,
 						bestStateError * 100, currentStateError * 100, mutantStateError * 100)
 		}
 	}
 	PRINT_FLUSH(1, "Cycle %d Initial %f%% Best %f%% \n", cycle, initialError * 100, bestStateError * 100)
 	deleteVector(changeVector);
-	FINISH_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates)
+	return finishOptimizingNetwork(original, current, best, mutant, output, intermediates);
 }
 
 neuralNetwork* evolveNetwork(neuralNetwork* original, trainingData* train, netOptSettings* settings) {
-	START_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates, initialError, bestStateError)
+	neuralNetwork* current = cloneNeuralNetwork(original);
+	neuralNetwork* best = cloneNeuralNetwork(original);
+	neuralNetwork* mutant = cloneNeuralNetwork(original);
+	matrix* output = createMatrix(train->output->height, getNetworkOutputs(original));
+	matrix* intermediates = createNetworkIntermediates(original, getTrainingDataCount(train));
+	netF initialError = calculateTrainingDataError(original, train, output, intermediates);
+	PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Initial %f%%\n", initialError * 100)
+	netF bestStateError = initialError;
 
 	int maxCycles = settings->maxRounds;
 	int childrenPerGeneration = settings->childCount;
@@ -546,18 +593,25 @@ neuralNetwork* evolveNetwork(neuralNetwork* original, trainingData* train, netOp
 		if (cycle % childrenPerGeneration == 0) {
 			copyNeuralNetwork(best, current);
 		}
-		if (cycle % 10000 == 0) {
+		if (cycle % NEURAL_NETWORK_LOG_ROUND_INTERVAL == 0) {
 			PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Cycle %d Best %f%% Mut %f%%\n", cycle, bestStateError * 100, mutantStateError * 100)
 		}
 	}	
 	
 	PRINT_FLUSH(1, "Cycle %d Initial %f%% Best %f%% \n", cycle, initialError * 100, bestStateError * 100)
 
-	FINISH_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates)
+	return finishOptimizingNetwork(original, current, best, mutant, output, intermediates);
 }
 
 neuralNetwork* annealNetwork(neuralNetwork* original, trainingData* train, netOptSettings* settings) {
-	START_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates, initialError, bestStateError)
+	neuralNetwork* current = cloneNeuralNetwork(original);
+	neuralNetwork* best = cloneNeuralNetwork(original);
+	neuralNetwork* mutant = cloneNeuralNetwork(original);
+	matrix* output = createMatrix(train->output->height, getNetworkOutputs(original));
+	matrix* intermediates = createNetworkIntermediates(original, getTrainingDataCount(train));
+	netF initialError = calculateTrainingDataError(original, train, output, intermediates);
+	PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Initial %f%%\n", initialError * 100)
+	netF bestStateError = initialError;
 
 	int maxCycles = settings->maxRounds;
 	int cooldownCycles = settings->coolRounds;
@@ -594,7 +648,7 @@ neuralNetwork* annealNetwork(neuralNetwork* original, trainingData* train, netOp
 			copyNeuralNetwork(mutant, best);
 		}
 
-		if (cycle % 10000 == 0) {
+		if (cycle % NEURAL_NETWORK_LOG_ROUND_INTERVAL == 0) {
 			PRINT_FLUSH(NEURAL_NETWORK_INCLUDE_DEBUG_LOGS, "Cycle %d Temp %f Best %f%% Curr %f%% Mut %f%%\n", cycle, temp,
 					bestStateError * 100, currentStateError * 100, mutantStateError * 100)
 		}
@@ -602,7 +656,7 @@ neuralNetwork* annealNetwork(neuralNetwork* original, trainingData* train, netOp
 
 	PRINT_FLUSH(1, "Cycle %d Initial %f%% Best %f%% \n", cycle, initialError * 100, bestStateError * 100)
 
-	FINISH_OPTIMIZING_NETWORK(original, current, best, mutant, output, intermetidates)
+	return finishOptimizingNetwork(original, current, best, mutant, output, intermediates);
 }
 
 neuralNetwork* createEmptyNetwork(int numLayers) {

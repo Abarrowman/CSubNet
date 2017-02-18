@@ -45,6 +45,7 @@ matrix* expandMultMatrices(matrix* left, matrix *right, matrix* result);
 matrix* expandMultCollapseMatrices(matrix* left, matrix *right, matrix* result);
 matrix* transExpandMultCollapseMatrices(matrix* left, matrix *right, matrix* result);
 
+matrix* copyMatrixRows(matrix* orig, matrix* result, int* rowIdxs);
 
 matrix* transposeMatrix(matrix* original, matrix* result);
 matrix* transposeMatrixSelf(matrix* original, netF* extraData);

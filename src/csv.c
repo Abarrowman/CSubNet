@@ -7,7 +7,7 @@
 #include "matrix.h"
 #include "coreDefs.h"
 
-#define MAX_CSV_SIZE (1024 * 1024 * 10)
+#define MAX_CSV_SIZE (1024 * 1024 * 1024)
 #define CSV_INCLUDE_DEBUG_LOGS 0
 #define CSV_INCLUDE_ERROR_LOGS 1
 

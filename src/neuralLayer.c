@@ -7,12 +7,14 @@
 #include "utils.h"
 
 __inline netF layerSigmoid(netF input) {
-	return (netF)((input / (1 + fabs(input)) + 1) / 2);
+	//return (netF)((input / (1 + fabs(input)) + 1) / 2);
+	return 1 / (1 + expf(-1 * input));
 }
 
 __inline netF layerSigmoidDerivative(netF input) {
-	netF denom = (netF)(fabs(input) + 1);
-	return 1 / (2 * denom * denom);
+	//netF denom = (netF)(fabs(input) + 1);
+	//return 1 / (2 * denom * denom);
+	return layerSigmoid(input) * (1 - layerSigmoid(input));
 }
 
 static __inline void applySigmoidDerivative(netF* __restrict vals, int count) {

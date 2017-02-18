@@ -17,10 +17,13 @@ typedef struct intResultStub {
 	int result;
 } intResult;
 
-#define PRINT_FLUSH(guard, format, ...) \
-	if (guard) { printf(format, ## __VA_ARGS__); fflush(stdout); }
+#define PRINT_STREAM_FLUSH(guard, stream, format, ...) \
+	if (guard) { fprintf(stream, format, ## __VA_ARGS__); fflush(stream); }
 
-#define pauseLike() \
+
+#define PRINT_FLUSH(guard, format, ...) PRINT_STREAM_FLUSH(guard, stdout, format, __VA_ARGS__)
+
+#define PAUSE() \
     PRINT_FLUSH(1, "Press enter to continue.\n"); \
     int _ch = 0; while (_ch == 0) _ch = getchar(); 
 

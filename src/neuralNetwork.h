@@ -15,15 +15,24 @@ typedef struct neuralNetworkStub {
 
 struct netOptSettingsStub;
 typedef struct netOptSettingsStub {
+	//stuck onto this structure for convenience but don't entirely belong here 
+	int labelColumns;
+
 	//general
 	int maxRounds;
 	int algorithm;
+
 	//annealing
 	int coolRounds;
+
 	//swarm
 	int particleCount;
+
 	//evolution
 	int childCount;
+
+	//backprop
+	int portionTrain;
 } netOptSettings;
 
 netOptSettings* initNetOptSettings(netOptSettings* settings);

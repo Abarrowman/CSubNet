@@ -33,7 +33,7 @@ matrix* fillMatrixZero(matrix* m) {
 matrix* fillMatrixRandom(matrix* m) {
 	int i;
 	for (i = 0; i < (m->width * m->height); i++) {
-		m->vals[i] = randomNetF();
+		m->vals[i] = randomNetF() * 2 - 1;
 	}
 	return m;
 }
@@ -326,6 +326,14 @@ static __inline void innerTransposeMatrix(const netF* original, netF* result, co
 			}
 		}
 	}
+}
+
+matrix* copyMatrixRows(matrix* orig, matrix* result, int* rowIdxs) {
+	int wide = result->width;
+	for (int row = 0; row < result->height; row++) {
+		memcpy(result->vals + wide * row, orig->vals + wide * rowIdxs[row], sizeof(netF) * wide);
+	}
+	return result;
 }
 
 matrix* transposeMatrix(matrix* original, matrix* result) {
