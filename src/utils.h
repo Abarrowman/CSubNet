@@ -18,10 +18,10 @@ typedef struct intResultStub {
 } intResult;
 
 #define PRINT_STREAM_FLUSH(guard, stream, format, ...) \
-	if (guard) { fprintf(stream, format, ## __VA_ARGS__); fflush(stream); }
+	if (guard) { fprintf(stream, format, ##__VA_ARGS__); fflush(stream); }
 
 
-#define PRINT_FLUSH(guard, format, ...) PRINT_STREAM_FLUSH(guard, stdout, format, __VA_ARGS__)
+#define PRINT_FLUSH(guard, format, ...) PRINT_STREAM_FLUSH(guard, stdout, format, ##__VA_ARGS__)
 
 #define PAUSE() \
     PRINT_FLUSH(1, "Press enter to continue.\n"); \
