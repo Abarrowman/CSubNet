@@ -14,8 +14,8 @@ if(CMAKE_COMPILER_IS_GNUCC)
 	#GCC Options
 	#link math library
 	target_link_libraries(CSubNet m)
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffast-math -march=native -fopenmp")
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -fopenmp")
 elseif (MSVC)
 	#MSVC Options
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /fp:fast /arch:SSE2 /openmp")
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /arch:SSE2 /openmp")
 endif()
