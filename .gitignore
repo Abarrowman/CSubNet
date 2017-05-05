@@ -1,2 +1,3 @@
 /build/*
-/WSLbuild/*
+/MSbuild/*
+/test/*
