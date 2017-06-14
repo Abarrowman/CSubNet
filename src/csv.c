@@ -131,6 +131,9 @@ csv* readCSV(char* file) {
 			}
 		}
 	}
+	if (newLineOk) {
+		numLines++;
+	}
 
 	PRINT_FLUSH(CSV_INCLUDE_DEBUG_LOGS, "Lines: %d, Columns: %d \n", numLines, numCols);
 
@@ -160,6 +163,14 @@ csv* readCSV(char* file) {
 		} else {
 			if ((c == '\n') || (c == '\r')) {
 				if (newLineOk) {
+					if (colIdx != numCols - 1) {
+						free(data->contents);
+						free(data);
+						free(csvText);
+						PRINT_FLUSH(CSV_INCLUDE_ERROR_LOGS,
+							"There are not %d column(s) on row %d of [%s].\n", numCols, rowIdx + 1, file);
+						return NULL;
+					}
 					frag = data->contents + colIdx + numCols * rowIdx;
 					frag->start = start;
 					frag->length = length;
@@ -180,6 +191,14 @@ csv* readCSV(char* file) {
 					length = -1;
 					quoted = 1;
 				} else if (c == ',') {
+					if (colIdx >= numCols) {
+						free(data->contents);
+						free(data);
+						free(csvText);
+						PRINT_FLUSH(CSV_INCLUDE_ERROR_LOGS,
+							"There are more than %d column(s) on row %d of [%s].\n", numCols, rowIdx + 1, file);
+						return NULL;
+					}
 					frag = data->contents + colIdx + numCols * rowIdx;
 					frag->start = start;
 					frag->length = length;
@@ -191,6 +210,30 @@ csv* readCSV(char* file) {
 			}
 		}
 		length++;
+	}
+	if ((colIdx != numCols) && (rowIdx != numLines)) {
+		if (newLineOk &&  (colIdx == (numCols - 1)) && (rowIdx == (numLines - 1))) {
+			frag = data->contents + colIdx + numCols * rowIdx;
+			frag->start = start;
+			frag->length = length;
+			PRINT_FLUSH(CSV_INCLUDE_DEBUG_LOGS, "Frag (%d,%d) [%.*s] \n", rowIdx, colIdx, length, start);
+			rowIdx++;
+			colIdx = 0;
+		} else {
+			free(data->contents);
+			free(data);
+			free(csvText);
+			PRINT_FLUSH(CSV_INCLUDE_ERROR_LOGS,
+				"There are not %d column(s) on row %d of [%s].\n", numCols, rowIdx + 1, file);
+			return NULL;
+		}
+	} else if (newLineOk) {
+		free(data->contents);
+		free(data);
+		free(csvText);
+		PRINT_FLUSH(CSV_INCLUDE_ERROR_LOGS,
+			"There are more than %d column(s) on row %d of [%s].\n", numCols, rowIdx + 1, file);
+		return NULL;
 	}
 
 	return data;
